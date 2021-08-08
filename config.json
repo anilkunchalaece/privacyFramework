@@ -1,0 +1,19 @@
+{
+    "vibe" :{
+        "tracking_method" : "bbox",
+        "detector" : "yolo",
+        "yolo_img_size" : 416,
+        "tracker_batch_size" : 6,
+        "vibe_batch_size" : 100
+    },
+
+    "sttn" : {
+        "model" : "sttn",
+        "ckpt" : "data/sttn_data/sttn.pth"
+    },
+
+    "ppfp" : {
+        "batch_size" : 3,
+        "score_threshold" : 0.75
+    }
+}

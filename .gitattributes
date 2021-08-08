@@ -1,0 +1,2 @@
+data/sttn_data filter=lfs diff=lfs merge=lfs -text
+data/vibe_data filter=lfs diff=lfs merge=lfs -text
