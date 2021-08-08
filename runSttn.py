@@ -93,8 +93,9 @@ def read_frame_from_videos(vname):
 # read images from dir
 def read_frames_from_dir(dirName):
     frames = []
-    fileNames = os.listdir(dirName)
+    fileNames = sorted(os.listdir(dirName))
     for fName in fileNames :
+        # print(fName)
         image = Image.open(os.path.join(dirName,fName))
         # image = Image.fromarray(cv2.cvtColor(Image.open(os.path.join(dirName,fName)), cv2.COLOR_BGR2RGB))       
         frames.append(image)
