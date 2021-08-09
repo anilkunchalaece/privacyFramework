@@ -1,0 +1,8 @@
+out/*
+out_temp/*
+tmp/*
+school_girls_org/*
+venv/*
+*.mp4
+*.pyc
+*.pkl

@@ -26,6 +26,7 @@ def main(args):
     print(args.tmp_dir)
 
     # step 1 : check vid_file or images_dir
+    print("########## STEP 1 creating images if video file is used #################")
     if args.vid_file == None and args.images_dir == None :
         raise("Please specify either --vid_file or --images_dir as argument")
     elif args.vid_file != None :
@@ -36,25 +37,29 @@ def main(args):
         srcImagesDir = args.images_dir
     
     # step 2 : generate masks for images
+    print("########## STEP 2 generating masks for images #################")
     srcImgMasksDir = createDir(os.path.join(args.tmp_dir,"masks"))
     m = GetMask()
     m.generateMasks(srcImagesDir, srcImgMasksDir)
 
     # step 3 : run STTN to extract background
-    extractBackgroundUsingStnn(srcImgMasksDir, srcImagesDir)
+    print("########## STEP 3 extracting background #################")
+    backgroundImgsDir = createDir(os.path.join(args.tmp_dir,"background"))
+    extractBackgroundUsingStnn(srcImgMasksDir, srcImagesDir,backgroundImgsDir)
 
     # step 4 : run VIBE to extract wireframe representations from file
-    extractWireframesUsingVibe(srcImagesDir,args.output_dir)
+    print("########## STEP 4 generating wireframes #################")
+    extractWireframesUsingVibe(srcImagesDir,args.output_dir,backgroundImgsDir)
 
 
-def extractBackgroundUsingStnn(maskImgDir,srcImageDir,checkPointFile=os.path.join("data","sttn_data","sttn.pth")):
+def extractBackgroundUsingStnn(maskImgDir,srcImageDir,backgroundImgsDir,checkPointFile=os.path.join("data","sttn_data","sttn.pth")):
     print(F"Extracting background using sttn with masks from {maskImgDir} , images from {srcImageDir} and checkpoint from {checkPointFile}")
-    cmd = ["python","runSttn.py","--mask",maskImgDir,"--ckpt",checkPointFile,"--image_dir",srcImageDir]
+    cmd = ["python","runSttn.py","--mask",maskImgDir,"--ckpt",checkPointFile,"--image_dir",srcImageDir,"--output_dir",backgroundImgsDir]
     runCmd(cmd)
 
-def extractWireframesUsingVibe(srcImageDir,outputDir):
+def extractWireframesUsingVibe(srcImageDir,outputDir,backgroundImgsDir):
     print(F"Extracting wireframe representations using images from {srcImageDir}")
-    cmd = ["python","runVibe.py","--images_dir",srcImageDir,"--output_folder",outputDir]
+    cmd = ["python","runVibe.py","--images_dir",srcImageDir,"--output_folder",outputDir,"--background",backgroundImgsDir]
     runCmd(cmd)
 
 

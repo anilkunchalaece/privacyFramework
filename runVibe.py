@@ -287,6 +287,9 @@ def main(args):
         frame_results = prepare_rendering_results(vibe_results, num_frames)
         mesh_color = {k: colorsys.hsv_to_rgb(np.random.rand(), 0.5, 1.0) for k in vibe_results.keys()}
 
+        if args.background != None :
+            image_folder = args.background
+
         image_file_names = sorted([
             os.path.join(image_folder, x)
             for x in os.listdir(image_folder)
@@ -377,7 +380,7 @@ if __name__ == '__main__':
     parser.add_argument('--yolo_img_size', type=int, default=416,
                         help='input image size for yolo detector')
 
-    parser.add_argument('--tracker_batch_size', type=int, default=6,
+    parser.add_argument('--tracker_batch_size', type=int, default=4,
                         help='batch size of object detector used for bbox tracking')
 
     parser.add_argument('--staf_dir', type=str, default='/home/mkocabas/developments/openposetrack',
@@ -414,6 +417,9 @@ if __name__ == '__main__':
     parser.add_argument('--smooth_beta', type=float, default=0.7,
                         help='one euro filter beta. '
                              'Increasing the speed coefficient(beta) decreases speed lag.')
+    
+    parser.add_argument('--background', type=str, default=None,
+                        help="output_dir of sttn results, contains the background images")
 
     args = parser.parse_args()
 

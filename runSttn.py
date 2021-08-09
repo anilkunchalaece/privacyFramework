@@ -36,6 +36,7 @@ from lib.sttn.core.utils import Stack, ToTorchFormatTensor
 parser = argparse.ArgumentParser(description="STTN")
 parser.add_argument("-v", "--video", type=str, required=False, default=None)
 parser.add_argument("-i", "--image_dir", type=str, required=True)
+parser.add_argument("-o","--output_dir", type=str, required=True)
 parser.add_argument("-m", "--mask",   type=str, required=True)
 parser.add_argument("-c", "--ckpt",   type=str, required=True)
 parser.add_argument("--model",   type=str, default='sttn')
@@ -98,12 +99,13 @@ def read_frames_from_dir(dirName):
         # print(fName)
         image = Image.open(os.path.join(dirName,fName))
         # image = Image.fromarray(cv2.cvtColor(Image.open(os.path.join(dirName,fName)), cv2.COLOR_BGR2RGB))       
-        frames.append(image)
+        frames.append(image.resize((w,h)))
     return frames
 
 def main_worker():
     # set up models 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(F"using {device}")
     net = importlib.import_module('lib.sttn.model.' + args.model)
     model = net.InpaintGenerator().to(device)
     model_path = args.ckpt
@@ -151,13 +153,16 @@ def main_worker():
                 else:
                     comp_frames[idx] = comp_frames[idx].astype(
                         np.float32)*0.5 + img.astype(np.float32)*0.5
-    writer = cv2.VideoWriter(f"{args.mask}_result.mp4", cv2.VideoWriter_fourcc(*"mp4v"), default_fps, (w, h))
+    outVideoFile = os.path.join(args.output_dir,"background.mp4")
+    writer = cv2.VideoWriter(outVideoFile, cv2.VideoWriter_fourcc(*"mp4v"), default_fps, (w, h))
     for f in range(video_length):
         comp = np.array(comp_frames[f]).astype(
             np.uint8)*binary_masks[f] + frames[f] * (1-binary_masks[f])
-        writer.write(cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB))
+        img = cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB)
+        writer.write(img)
+        cv2.imwrite(os.path.join(args.output_dir,F"{f:06d}.png"), img)
     writer.release()
-    print('Finish in {}'.format(f"{args.mask}_result.mp4"))
+    print('Finish in video is {} and images saved in {}'.format(outVideoFile,args.output_dir))
 
 
 
