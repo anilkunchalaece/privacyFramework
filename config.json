@@ -3,7 +3,7 @@
         "tracking_method" : "bbox",
         "detector" : "yolo",
         "yolo_img_size" : 416,
-        "tracker_batch_size" : 6,
+        "tracker_batch_size" : 4 ,
         "vibe_batch_size" : 100
     },
 
@@ -13,7 +13,7 @@
     },
 
     "ppfp" : {
-        "batch_size" : 3,
+        "batch_size" : 5,
         "score_threshold" : 0.75
     }
 }

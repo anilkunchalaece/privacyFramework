@@ -30,12 +30,16 @@ def main(args):
     if args.vid_file == None and args.images_dir == None :
         raise("Please specify either --vid_file or --images_dir as argument")
     elif args.vid_file != None :
-        srcImagesDir = createDir(os.path.join(args.tmp_dir,"orig_images"))
-        generateImagesFromVideo(args.vid_file, srcImagesDir)
+        srcImagesDirOrg = createDir(os.path.join(args.tmp_dir,"orig_images"))
+        generateImagesFromVideo(args.vid_file, srcImagesDirOrg)
     else :
         print(F"processing images using src {args.images_dir}")
-        srcImagesDir = args.images_dir
+        srcImagesDirOrg = args.images_dir
     
+    # Step 1.5 -> resize the images to w, h = 432, 240 (from sttn)
+    srcImagesDir = createDir(os.path.join(args.tmp_dir,"orig_images_scaled"))
+    resizeImages(srcImagesDirOrg,srcImagesDir)
+
     # step 2 : generate masks for images
     print("########## STEP 2 generating masks for images #################")
     srcImgMasksDir = createDir(os.path.join(args.tmp_dir,"masks"))
@@ -50,6 +54,12 @@ def main(args):
     # step 4 : run VIBE to extract wireframe representations from file
     print("########## STEP 4 generating wireframes #################")
     extractWireframesUsingVibe(srcImagesDir,args.output_dir,backgroundImgsDir)
+
+def resizeImages(srcDir,desDir):
+    print(" resizing the images ")
+    imageExtn = os.listdir(srcDir)[0][-3:]
+    cmd = ['convert', F'"{srcDir}/*.{imageExtn}"','-resize' ,'432x240!' ,'-set', 'filename:base', '"%[basename]"',F'"{desDir}/%[filename:base].{imageExtn}"']
+    runCmd(cmd)
 
 
 def extractBackgroundUsingStnn(maskImgDir,srcImageDir,backgroundImgsDir,checkPointFile=os.path.join("data","sttn_data","sttn.pth")):
@@ -77,12 +87,11 @@ def createDir(dirName,removeIfExists=False) :
 
 def runCmd(cmd) :
     # cmd -> list of cmd and its arguments
+    cmd = " ".join(cmd)
     print(F"running cmd {cmd}")
-    os.system(" ".join(cmd))
+    os.system(cmd)
     # r = subprocess.run(cmd,capture_output=True,text=True,check=True)
     # print(F"output of cmd is {r}")
-
-
 
 
 

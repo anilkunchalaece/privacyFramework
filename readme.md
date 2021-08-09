@@ -15,3 +15,8 @@ DeepSort for Tracking
 
 VIBE with Openpose
 - Currently I'm unable to run VIBE using openpose. Currently VIBE is using multiperson tracker ( with SORT to track people ).
+
+### Extra tool needed
+- ffmpeg - to convert video to images
+- convert / image magick - used for batch image resizing
+    - Why two ? I'm lazy :)

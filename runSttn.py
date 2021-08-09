@@ -28,6 +28,7 @@ import torch.utils.model_zoo as model_zoo
 from torchvision import models
 import torch.multiprocessing as mp
 from torchvision import transforms
+import gc
 
 # My libs
 from lib.sttn.core.utils import Stack, ToTorchFormatTensor
@@ -106,6 +107,7 @@ def main_worker():
     # set up models 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(F"using {device}")
+    
     net = importlib.import_module('lib.sttn.model.' + args.model)
     model = net.InpaintGenerator().to(device)
     model_path = args.ckpt
