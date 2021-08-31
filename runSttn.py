@@ -38,7 +38,7 @@ parser = argparse.ArgumentParser(description="STTN")
 parser.add_argument("-v", "--video", type=str, required=False, default=None)
 parser.add_argument("-i", "--image_dir", type=str, required=True)
 parser.add_argument("-o","--output_dir", type=str, required=True)
-parser.add_argument("-m", "--mask",   type=str, required=True)
+parser.add_argument("-m", "--mask_dir",   type=str, required=True)
 parser.add_argument("-c", "--ckpt",   type=str, required=True)
 parser.add_argument("--model",   type=str, default='sttn')
 args = parser.parse_args()
@@ -64,7 +64,7 @@ def get_ref_index(neighbor_ids, length):
 
 
 # read frame-wise masks 
-def read_mask(mpath):
+def read_mask_from_dir(mpath):
     masks = []
     mnames = os.listdir(mpath)
     mnames.sort()
@@ -103,7 +103,7 @@ def read_frames_from_dir(dirName):
         frames.append(image.resize((w,h)))
     return frames
 
-def main_worker():
+def main_worker(frames,masks,sIdx=0):
     # set up models 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(F"using {device}")
@@ -118,12 +118,12 @@ def main_worker():
 
     # prepare datset, encode all frames into deep space 
     # frames = read_frame_from_videos(args.video)
-    frames = read_frames_from_dir(args.image_dir)
+    # frames = read_frames_from_dir(args.image_dir)
     video_length = len(frames)
     feats = _to_tensors(frames).unsqueeze(0)*2-1
     frames = [np.array(f).astype(np.uint8) for f in frames]
 
-    masks = read_mask(args.mask)
+    # masks = read_mask_from_dir(args.mask_dir)
     binary_masks = [np.expand_dims((np.array(m) != 0).astype(np.uint8), 2) for m in masks]
     masks = _to_tensors(masks).unsqueeze(0)
     feats, masks = feats.to(device), masks.to(device)
@@ -133,7 +133,7 @@ def main_worker():
         feats = model.encoder((feats*(1-masks).float()).view(video_length, 3, h, w))
         _, c, feat_h, feat_w = feats.size()
         feats = feats.view(1, video_length, c, feat_h, feat_w)
-    print('loading videos and masks from: {}'.format(args.video))
+    # print('loading videos and masks from: {}'.format(args.video))
 
     # completing holes by spatial-temporal transformers
     for f in range(0, video_length, neighbor_stride):
@@ -156,19 +156,46 @@ def main_worker():
                     comp_frames[idx] = comp_frames[idx].astype(
                         np.float32)*0.5 + img.astype(np.float32)*0.5
     outVideoFile = os.path.join(args.output_dir,"background.mp4")
-    writer = cv2.VideoWriter(outVideoFile, cv2.VideoWriter_fourcc(*"mp4v"), default_fps, (w, h))
+    # writer = cv2.VideoWriter(outVideoFile, cv2.VideoWriter_fourcc(*"mp4v"), default_fps, (w, h))
     for f in range(video_length):
         comp = np.array(comp_frames[f]).astype(
             np.uint8)*binary_masks[f] + frames[f] * (1-binary_masks[f])
         img = cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB)
-        writer.write(img)
-        cv2.imwrite(os.path.join(args.output_dir,F"{f:06d}.png"), img)
-    writer.release()
-    print('Finish in video is {} and images saved in {}'.format(outVideoFile,args.output_dir))
+        # writer.write(img)
+        cv2.imwrite(os.path.join(args.output_dir,F"{f+sIdx:06d}.png"), img) # sIdx is used to keep names when running batches
+    # writer.release()
 
+    # delete gpu variables and remove cache
+    del model
+    del masks
+    del feats
+    torch.cuda.empty_cache()
+
+    # print('Finish in video is {} and images saved in {}'.format(outVideoFile,args.output_dir))
+
+def main():
+    frames = read_frames_from_dir(args.image_dir)
+    masks = read_mask_from_dir(args.mask_dir)
+    BATCH_SIZE = 200 # change based on system capability 
+    if len(frames) != len(masks) :
+        raise(F"number of frames :{len(frames)} should be equal to number of masks : {len(masks)}")
+    print(F"total number of images in dataset are {len(frames)}")
+    if len(frames) < BATCH_SIZE :
+        main_worker(frames, masks)
+    else :
+        for i in range(0,len(frames),BATCH_SIZE) :
+            sIdx = i
+            eIdx = i + BATCH_SIZE
+            # for last set of frames we are taking the last 200 frames ,eventhough it may run model on few same images , we will get better results 
+            if eIdx >= len(frames) :
+                eIdx = len(frames) - 1
+                sIdx = len(frames) - BATCH_SIZE
+            print(F"running for frames from {sIdx} to {eIdx}")
+            main_worker(frames[sIdx:eIdx],masks[sIdx:eIdx],sIdx)
 
 
 if __name__ == '__main__':
-    main_worker()
+    # main_worker()
+    main()
     # dir_name = "/home/akunchala/Documents/PhDStuff/STTN/examples/school_girls_org"
     # read_frames_from_dir(dir_name)
