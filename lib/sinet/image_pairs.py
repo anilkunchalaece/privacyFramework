@@ -49,13 +49,13 @@ class ImagePairGen :
             tImgsMaxIndex = tImgs.index(max(tImgs))
             
             tMaxFrames = tracklets[tImgsMaxIndex]
-            print(F"no of tracklets in pId : {sId} are : {len(tracklets)} and tacklet : {tMaxFrames} has Max number of frames : {max(tImgs)}")
+            # print(F"no of tracklets in pId : {sId} are : {len(tracklets)} and tacklet : {tMaxFrames} has Max number of frames : {max(tImgs)}")
             # self.getTrackeletIdwithMaxFrames(_sidDir)
             pImgs= glob.glob(F"{_sidDir}/*{tMaxFrames}*") 
             if self.max_frames == None or max(tImgs) < self.max_frames:
                 allImgs[sId] = pImgs
             else : 
-                print(F"selecting only : {self.max_frames} images from {max(tImgs)}")
+                # print(F"selecting only : {self.max_frames} images from {max(tImgs)}")
                 allImgs[sId] = glob.glob(F"{_sidDir}/*{tMaxFrames}*")[:self.max_frames]
         
         return allImgs
@@ -112,16 +112,19 @@ class ImagePairGen :
         fig = plt.figure()
         grid = ImageGrid(fig, 111,  # similar to subplot(111)
                         nrows_ncols=(3, 9),  # creates 2x2 grid of axes
-                        axes_pad=0.1,  # pad between axes in inch.
+                        axes_pad=0.25,  # pad between axes in inch.
                         )
 
         imgs = []
+        titles = []
         for img in triplets_sel :
             imgs.extend([cv2.imread(i)[:,:,::-1] for i in img])
+            titles.extend(['Anchor','Positive','Negative'])
 
-        for ax, im in zip(grid, imgs):
+        for ax, im, t in zip(grid, imgs,titles):
             # Iterating over the grid returns the Axes.
             ax.imshow(im)
+            ax.set_title(t)
         plt.show()
 
 
