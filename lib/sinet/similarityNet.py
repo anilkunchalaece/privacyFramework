@@ -7,7 +7,7 @@ class SimilarityNet(nn.Module):
     def __init__(self):
         super(SimilarityNet, self).__init__()
 
-        self.net = models.resnet18(pretrained=True)
+        self.net = models.resnet152(pretrained=True)
 
         # freeze layers of pre-trained model
         for param in self.net.parameters() :
@@ -16,10 +16,13 @@ class SimilarityNet(nn.Module):
         fc_inp = self.net.fc.in_features
 
         self.net.fc = nn.Sequential(
-            nn.Linear(fc_inp, 256),
+            nn.Linear(fc_inp, 1024),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(256, 200),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(0.2),            
+            nn.Linear(512, 300),
         )
 
     def forward_one(self,x):

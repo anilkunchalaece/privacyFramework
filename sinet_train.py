@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
+import torchvision
 
 from sklearn.model_selection import train_test_split
 
@@ -28,8 +29,9 @@ def train():
     transform = transforms.Compose([transforms.ToTensor(),
                                     transforms.RandomRotation(degrees=45)])
     root_dir = "/home/akunchala/Downloads/MARS_Dataset/bbox_train"
-    triplets = ImagePairGen(root_dir,limit_ids=250 ,max_frames=None)
-    train, valid = train_test_split(triplets.generateTripletsRandomly(),shuffle=True)
+    t = ImagePairGen(root_dir,limit_ids=200 ,max_frames=None)
+    triplets = t.generateTripletsRandomly()
+    train, valid = train_test_split(triplets,shuffle=True)
 
     train_dataset = TripletDataset(train, transform)
     valid_dataset = TripletDataset(valid, transform)
@@ -125,6 +127,40 @@ def plotLoss():
     except Exception as e :
         print(F"unable to open {fileName} with exception {str(e)}")
 
+
+def eval():
+    transform = transforms.Compose([transforms.ToTensor()])
+    root_dir = "/home/akunchala/Downloads/MARS_Dataset/bbox_test"
+    t = ImagePairGen(root_dir,limit_ids=50 ,max_frames=None)
+    triplets = t.generateTripletsRandomly()
+
+    triplet_dataset = TripletDataset(triplets, transform)
+
+    triplet_dataloader = DataLoader(triplet_dataset,batch_size=100,shuffle=True,drop_last=True)
+    
+    model = SimilarityNet()
+    model.load_state_dict(torch.load('models/sinet.pth'))
+    model = model.to(device)
+    model.eval()
+
+    for idx, data in enumerate(triplet_dataloader):
+        anchorImgs = data["anchorImg"].to(device)
+        positiveImgs = data["positiveImg"].to(device)
+        negativeImgs = data["negativeImg"].to(device)
+        a_f,p_f,n_f = model(anchorImgs,positiveImgs,negativeImgs)
+        print(a_f.shape)
+
+        ap_si = nn.functional.cosine_similarity(a_f, p_f,dim=1)
+        an_si = nn.functional.cosine_similarity(a_f, n_f,dim=1)
+        print(ap_si.detach().cpu())
+        print(an_si.detach().cpu())
+        break
+
+
+
+
+
 if __name__ == "__main__" :
     train()
-    plotLoss()
+    # plotLoss()
+    # eval()
