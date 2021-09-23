@@ -188,7 +188,7 @@ def main():
             eIdx = i + BATCH_SIZE
             # for last set of frames we are taking the last 200 frames ,eventhough it may run model on few same images , we will get better results 
             if eIdx >= len(frames) :
-                eIdx = len(frames) - 1
+                eIdx = len(frames)
                 sIdx = len(frames) - BATCH_SIZE
             print(F"running for frames from {sIdx} to {eIdx}")
             main_worker(frames[sIdx:eIdx],masks[sIdx:eIdx],sIdx)

@@ -279,7 +279,9 @@ def main(args):
         renderer = Renderer(resolution=(orig_width, orig_height), orig_img=True, wireframe=args.wireframe)
 
         output_img_folder = f'{image_folder}_output'
+        output_img_folder_empty_background = f'{image_folder}_output_empty_background'
         os.makedirs(output_img_folder, exist_ok=True)
+        os.makedirs(output_img_folder_empty_background, exist_ok=True)
 
         print(f'Rendering output video, writing frames to {output_img_folder}')
 
@@ -299,6 +301,7 @@ def main(args):
         for frame_idx in tqdm(range(len(image_file_names))):
             img_fname = image_file_names[frame_idx]
             img = cv2.imread(img_fname)
+            img_empty_background = np.zeros(img.shape)
 
             if args.sideview:
                 side_img = np.zeros_like(img)
@@ -324,6 +327,15 @@ def main(args):
                     mesh_filename=mesh_filename,
                 )
 
+                img_empty_background = renderer.render(
+                    img_empty_background,
+                    frame_verts,
+                    cam=frame_cam,
+                    color=mc,
+                    mesh_filename=mesh_filename,
+                    empty_background=False
+                )
+
                 if args.sideview:
                     side_img = renderer.render(
                         side_img,
@@ -338,6 +350,7 @@ def main(args):
                 img = np.concatenate([img, side_img], axis=1)
 
             cv2.imwrite(os.path.join(output_img_folder, f'{frame_idx:06d}.png'), img)
+            cv2.imwrite(os.path.join(output_img_folder_empty_background, f'{frame_idx:06d}.png'), img_empty_background)
 
             if args.display:
                 cv2.imshow('Video', img)
@@ -352,7 +365,7 @@ def main(args):
         save_name = f'{vid_name.replace(".mp4", "")}_vibe_result.mp4'
         save_name = os.path.join(output_path, save_name)
         print(f'Saving result video to {save_name}')
-        images_to_video(img_folder=output_img_folder, output_vid_file=save_name)
+        # images_to_video(img_folder=output_img_folder, output_vid_file=save_name)
         #shutil.rmtree(output_img_folder) # dont remove output folder
 
     #shutil.rmtree(image_folder) # dont remove input folder
