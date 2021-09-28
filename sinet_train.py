@@ -35,7 +35,7 @@ def train():
                                     transforms.Resize((img_height,img_width)),# height,width
                                     transforms.RandomRotation(degrees=45)])
     root_dir = "/home/akunchala/Documents/z_Datasets/MARS_Dataset/bbox_train"
-    t = ImagePairGen(root_dir,limit_ids=400 ,max_frames=None)
+    t = ImagePairGen(root_dir,limit_ids=None ,max_frames=None)
     triplets = t.generateTripletsRandomly()
     train, valid = train_test_split(triplets,shuffle=True)
 
@@ -175,6 +175,6 @@ def eval():
 
 
 if __name__ == "__main__" :
-    #train()
+    train()
     # plotLoss()
-    eval()
+    # eval()

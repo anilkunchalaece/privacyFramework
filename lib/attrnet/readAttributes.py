@@ -72,7 +72,11 @@ def listAllAttributes(save_dir) :
     print(len(data["attr_name"]))
     print(data["attr_name"])
     for k in data["partition"].keys() :
-        print(F'{k} => {data["partition"][k]}')
+        print(F'{k} => {list(data["partition"][k][1])[:10]}')
+    # print(data["label"][:,-15].tolist())
+    print(len(data["image_name"]))
+    print(data["partition"]["test"][1:10])
+    print(data["partition"]["test"][1:10])
 
 
 if __name__ == "__main__":

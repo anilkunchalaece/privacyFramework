@@ -7,7 +7,7 @@ class SimilarityNet(nn.Module):
     def __init__(self):
         super(SimilarityNet, self).__init__()
 
-        self.net = models.resnet152(pretrained=True)
+        self.net = models.resnet50(pretrained=True)
 
         # freeze layers of pre-trained model
         for param in self.net.parameters() :
