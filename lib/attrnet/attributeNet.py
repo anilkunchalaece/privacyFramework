@@ -18,12 +18,15 @@ class AttributeNet(nn.Module):
 
         self.net.fc = nn.Sequential(
             nn.Linear(fc_inp, 1024),
-            nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Dropout(0.2),            
-            nn.Linear(512, 37),
+            nn.Linear(1024, 512),
+            nn.Dropout(0.2),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.Dropout(0.2),
+            nn.ReLU(),
+            nn.Linear(256, 37),
         )
 
     def forward(self,x):

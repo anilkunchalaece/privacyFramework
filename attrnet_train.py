@@ -25,10 +25,10 @@ device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
 torch.manual_seed(42)
 print(F"running with {device}")
 
-img_width = 40
+img_width = 60
 img_height = 120
 batchSize = 100
-N_EPOCH = 15
+N_EPOCH = 1000
 
 def train():
     srcDir = "/home/akunchala/Documents/z_Datasets/RAP"
@@ -42,10 +42,11 @@ def train():
     # print(F"Original dataset length is {len(data)}")
 
     # train, valid = train_test_split(data,shuffle=True)
-    dataFileName = os.path.join(srcDir,"dataset_modified.pkl")
+    dataFileName = "data/RAP2/dataset_modified.pkl"
+    # dataFileName = os.path.join(srcDir,"dataset_modified.pkl")
     _d = loadDataFromFile(dataFileName)
-    train_dataset = AttrDataset(_d["train"], transform)
-    valid_dataset = AttrDataset(_d["valid"], transform)
+    train_dataset = AttrDataset(_d["train"][:1000], transform)
+    valid_dataset = AttrDataset(_d["valid"][:200], transform)
 
     train_dataloader = DataLoader(train_dataset,batch_size=batchSize,shuffle=True,drop_last=True)
     valid_dataloader = DataLoader(valid_dataset,batch_size=batchSize,shuffle=True,drop_last=True)
@@ -187,7 +188,7 @@ def plotLoss():
             d = json.load(fd)
             plt.plot(d["train"],label="Training")
             plt.plot(d["valid"],label="Validation")
-            plt.title("SiNet Training loss")
+            plt.title("Attr-Net Training loss")
             plt.legend()
             plt.show()
     except Exception as e :
@@ -195,8 +196,8 @@ def plotLoss():
 
 
 if __name__ == "__main__" :
-    train()
+    # train()
     # plotLoss()
-    # eval()
-    # fileName = "/home/akunchala/Documents/z_Datasets/RAP/RAP_eval_results.pkl"
-    # calculateF1Scores(fileName)
+    eval()
+    fileName = "/home/akunchala/Documents/z_Datasets/RAP/RAP_eval_results.pkl"
+    calculateF1Scores(fileName)
