@@ -24,8 +24,12 @@ class ImagePairGen :
         self.max_frames = max_frames
         
 
-    def readAllImgs(self):
-        totalIds = os.listdir(self.rootDir)
+    def readAllImgs(self, srcDir=None):
+        if srcDir == None :
+            totalIds = os.listdir(self.rootDir)
+        else :
+            totalIds = os.listdir(srcDir)
+
         print(F" total number of pedestrian ids in dir {self.rootDir} => {len(totalIds)}")
         
         # limit the number of ids to generate pairs -> used for faster testing 
@@ -140,9 +144,39 @@ class ImagePairGen :
             imgs = glob.glob(F"{pDir}/*{t}*")
             # print(imgs)
             print(F"no of tracklets in {pDir} are {len(tracklets)} and {pDir} has {len(imgs)} for tracklet {t}")
+    
+    # this function is used to generate pairs for eval 
+    def generatePairsForEval(self,dirDict):
+        allImgsGt = self.readAllImgs(dirDict["gt"])
+        predDir = dirDict["pred"]
+        
+        finalPairs = []
 
+        for k in allImgsGt.keys():
+            for img in allImgsGt[k]:
+                a_img = img
+                p_img = os.path.join(predDir,k,os.path.basename(img))
+                finalPairs.append([a_img, p_img])
+        
+        # print(len(finalPairs))
+        # print(finalPairs[0])
+        return finalPairs
 
 if __name__ == "__main__":
-    root_dir = "/home/akunchala/Downloads/MARS_Dataset/bbox_train"
-    p = ImagePairGen(root_dir,limit_ids=20 ,max_frames=None)
-    p.visualizeTriplets()
+    # this is for training 
+    # root_dir = "/home/akunchala/Documents/z_Datasets/MARS_Dataset/bbox_train"
+    # p = ImagePairGen(root_dir,limit_ids=20 ,max_frames=None)
+    # x = p.readAllImgs()
+    # # print(len(x[list(x.keys())[0]]))
+    # p.visualizeTriplets()
+
+    # Eval image pairs
+    gtDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/bbox/gt"
+    p = ImagePairGen(gtDir)
+    
+    dirDict = {
+        "gt" : gtDir,
+        "pred" : "/home/akunchala/Documents/PhDStuff/PrivacyFramework/bbox/pred"
+    }
+
+    p.generatePairsForEval(dirDict)

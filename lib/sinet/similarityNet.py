@@ -31,11 +31,14 @@ class SimilarityNet(nn.Module):
         x = self.net(x)
         return x
 
-    def forward(self,anchor,positive,negative):
+    def forward(self,anchor,positive,negative=None):
         a_out = self.forward_one(anchor)
         p_out = self.forward_one(positive)
-        n_out = self.forward_one(negative)
-        return a_out,p_out,n_out
+        if negative == None :
+            return a_out,p_out
+        else :
+            n_out = self.forward_one(negative)
+            return a_out,p_out,n_out
 
 
 

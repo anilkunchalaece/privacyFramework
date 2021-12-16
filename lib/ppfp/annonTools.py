@@ -55,7 +55,7 @@ def blurBbox(imgFile):
         x1,y1,x2,y2 = [int(x) for x in box]
         face = img[y1:y2,x1:x2]
         try :
-            face_blurred = blur_img(face,factor=20)
+            face_blurred = blur_img(face,factor=50)
         except :
             # print("factor")
             try :
@@ -74,8 +74,8 @@ def anonymize_face_pixelate(image):
 	# divide the input image into NxN blocks
     (h, w) = image.shape[:2]
     # print(F"h {h} w {w}")
-    xblocks = int(w/3)
-    yblocks = int(h/3)
+    xblocks = int(w/2)
+    yblocks = int(h/2)
 
     xSteps = np.linspace(0, w, xblocks + 1, dtype="int")
     ySteps = np.linspace(0, h, yblocks + 1, dtype="int")
@@ -168,8 +168,8 @@ def annomizeImgsInDir() :
         with Pool() as pool:
             pool.map(pixelateBbox,[ os.path.join(d,x) for x in os.listdir(d)])
 
-        with Pool() as pool:
-            pool.map(scrambleUsingDCT,[ os.path.join(d,x) for x in os.listdir(d)])
+        # with Pool() as pool:
+        #     pool.map(scrambleUsingDCT,[ os.path.join(d,x) for x in os.listdir(d)])
 
 
 

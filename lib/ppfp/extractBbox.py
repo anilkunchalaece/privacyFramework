@@ -67,21 +67,52 @@ def cropImage(bData):
     gt_img = cv2.imread(os.path.join(bData["gt_src"],bData["fileName"].replace(".txt", ".png")))
     pred_img = cv2.imread(os.path.join(bData["pred_src"],bData["fileName"].replace(".txt", ".png")))
 
+    annonBasePath = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/annomizedImgs"
+    annonDirs = {
+                "blur_body",
+                "blur_faces",
+                "dct_faces",
+                "pixelate_body",
+                "pixelate_faces",
+    }
+
+    annonDirs = [os.path.join(annonBasePath, d) for d in annonDirs]
+
+    ann_imgs = {}
+
+    for aD in annonDirs :
+        ann_imgs[aD] = cv2.imread(os.path.join(aD,bData["fileName"].replace(".txt", ".png")))
+
+    # annon_t_paths = [os.path.join(bData["bboxDir"], d, F'{bData["fileName"].split(".")[0]}') for d in annonDirs]
+    annon_t_paths = {}
+    
+    for aD in annonDirs:
+        annon_t_paths[aD] = os.path.join(bData["bboxDir"], os.path.basename(aD), F'{bData["fileName"].split(".")[0]}')
+
     gt_t_path = os.path.join(bData["bboxDir"],"gt",F'{bData["fileName"].split(".")[0]}')
     pred_t_path = os.path.join(bData["bboxDir"],"pred",F'{bData["fileName"].split(".")[0]}')
 
     try :
         os.mkdir(gt_t_path)
         os.mkdir(pred_t_path)
-    except :
-        pass
+        for k in annon_t_paths.keys() :
+            os.makedirs(annon_t_paths[k])
+    except Exception as e :
+        print(e)
+        # raise
 
     for i,x in enumerate(bData["matches"]):
 
+
+        # print(F'height {x["gt"][3] - x["gt"][1]} width {x["gt"][2] - x["gt"][0]}')
+        
         # print(F"{i} => {x}")
         gt_c = gt_img[x["gt"][1]:x["gt"][3],x["gt"][0]:x["gt"][2]]
         pred_c = pred_img[x["pred"][1]:x["pred"][3], x["pred"][0]:x["pred"][2]]
 
+        for k in ann_imgs.keys():
+            i_c = ann_imgs[k][x["gt"][1]:x["gt"][3],x["gt"][0]:x["gt"][2]]
+            cv2.imwrite(os.path.join(annon_t_paths[k],F'{i}.png'), i_c)
 
         # write cropped image to file
         cv2.imwrite(os.path.join(gt_t_path,F'{i}.png'),gt_c)
@@ -119,8 +150,6 @@ def cropBboxImages():
     
     with Pool() as pool:
         pool.map(cropImage,[getMatchingBboxes(x) for x in os.listdir("groundtruths")])
-
-
 
 
 if __name__ == "__main__" :

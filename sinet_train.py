@@ -13,7 +13,7 @@ import torchvision
 
 from sklearn.model_selection import train_test_split
 
-from lib.sinet.tripletDataset import TripletDataset
+from lib.sinet.tripletDataset import TripletDataset, PairDataset
 from lib.sinet.similarityNet import SimilarityNet
 from lib.sinet.image_pairs import ImagePairGen
 
@@ -35,7 +35,7 @@ def train():
                                     transforms.Resize((img_height,img_width)),# height,width
                                     transforms.RandomRotation(degrees=45)])
     root_dir = "/home/akunchala/Documents/z_Datasets/MARS_Dataset/bbox_train"
-    t = ImagePairGen(root_dir,limit_ids=None ,max_frames=None)
+    t = ImagePairGen(root_dir,limit_ids=100 ,max_frames=None)
     triplets = t.generateTripletsRandomly()
     train, valid = train_test_split(triplets,shuffle=True)
 
@@ -170,11 +170,52 @@ def eval():
         # print(F"an_si : {np.mean(an_si)}")
         break
 
+def evalResults(gtDir,predDir):
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    transforms.Resize((img_height,img_width))# height,width
+                                    ])
+
+    p = ImagePairGen(gtDir)
+    dirDict = {
+        "gt" : gtDir,
+        "pred" : predDir #"/home/akunchala/Documents/PhDStuff/PrivacyFramework/bbox/blur_body"
+    }
+
+    pairs = p.generatePairsForEval(dirDict)
+
+    pairs_dataset = PairDataset(pairs, transform)
+
+    pairs_dataloader = DataLoader(pairs_dataset,batch_size=batchSize,shuffle=True,drop_last=True)
+    
+    model = SimilarityNet()
+    model.load_state_dict(torch.load('/home/akunchala/Documents/PhDStuff/PrivacyFramework/models/sinet.pth'))
+    model = model.to(device)
+    model.eval()
+
+    ap_si_total = []
+
+    for idx, data in enumerate(pairs_dataloader):
+        anchorImgs = data["anchorImg"].to(device)
+        positiveImgs = data["positiveImg"].to(device)
+        a_f,p_f = model(anchorImgs,positiveImgs)
+        # print(a_f.shape)
+
+        ap_si = nn.functional.cosine_similarity(a_f, p_f,dim=1)
+        ap_si = ap_si.detach().cpu().numpy().tolist()
+        # print(F" ap_si : {np.mean(ap_si)}")
+        # ap_si_total = np.append(ap_si_total,ap_si,axis=0)
+        ap_si_total.extend(ap_si)
+        # print(an_si)
+        # print(F"an_si : {np.mean(an_si)}")
+    # print(len(ap_si_total))
+    # print(np.mean(np.array(ap_si_total)))
+    return np.mean(np.array(ap_si_total))
 
 
 
 
 if __name__ == "__main__" :
-    train()
+    # train()
     # plotLoss()
     # eval()
+    evalResults()

@@ -74,9 +74,19 @@ class PersonDetector:
                     scores = eachDetection["scores"][labelIdxs].detach().cpu().numpy().squeeze().tolist()
 
                     # print(boxes)
+                    #if there are no detections, skip the loop
+                    if len(boxes) == 0 :
+                        continue
+                    
+                    # if we detect only one person, convert it into list
+                    if type(boxes[0]) != list :
+                        boxes = [boxes]
+                        scores = [scores]
+                    
 
                     i_final = []
                     for i,b in enumerate(boxes) :
+                        # print(b)
                         x = []
                         x.extend([fName,"person"])
                         x.extend(b)
@@ -116,15 +126,13 @@ if __name__ == "__main__" :
     dirToSave = "out"
 
     # c = [
-        
-    #     {
-    #         "imageDir" : "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/orig_images_scaled_output",
-    #         "dirToSave" : "detections"
+    #     {'imageDir': 'annomizedImgs/pixelate_body', 
+    #     'dirToSave': 'annomizedImgs/pixelate_body_detections'
     #     },
-    #     {
-    #         "imageDir" : "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/orig_images_scaled",
-    #         "dirToSave" : "groundtruths"
-    #     }
+    #     # {
+    #     # 'imageDir': 'annomizedImgs/dct_body_detections',
+    #     # 'dirToSave': 'annomizedImgs/dct_body_detections_detections'
+    #     # }
     # ]
     c = []
     srcDir = "annomizedImgs"
@@ -134,15 +142,15 @@ if __name__ == "__main__" :
             "dirToSave" : os.path.join(srcDir,F"{dirName}_detections")
         })
 
-    # print(c)
+    print(c)
 
     for x in c :
         if os.path.isdir(x["dirToSave"]) :
             shutil.rmtree(x["dirToSave"])
         os.mkdir(x["dirToSave"])
         print(F"generating {x['dirToSave']}")
-        print(x["imageDir"], x["dirToSave"])
-        try :
-            p.generateDetections(x["imageDir"], x["dirToSave"])    
-        except :
-            print(F"unable to generate detection for {x['imageDir']}")
+        # print(x["imageDir"], x["dirToSave"])
+        # try :
+        p.generateDetections(x["imageDir"], x["dirToSave"])    
+        # except :
+            # print(F"unable to generate detection for {x['imageDir']}")
