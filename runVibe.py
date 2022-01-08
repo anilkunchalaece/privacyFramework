@@ -278,8 +278,8 @@ def main(args):
         # ========= Render results as a single video ========= #
         renderer = Renderer(resolution=(orig_width, orig_height), orig_img=True, wireframe=args.wireframe)
 
-        output_img_folder = f'{image_folder}_output'
-        output_img_folder_empty_background = f'{image_folder}_output_empty_background'
+        output_img_folder = f'{image_folder}_output'.replace("src","pred")
+        output_img_folder_empty_background = f'{image_folder}_output_empty_background'.replace("src","pred")
         os.makedirs(output_img_folder, exist_ok=True)
         os.makedirs(output_img_folder_empty_background, exist_ok=True)
 

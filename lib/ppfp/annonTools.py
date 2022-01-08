@@ -55,11 +55,11 @@ def blurBbox(imgFile):
         x1,y1,x2,y2 = [int(x) for x in box]
         face = img[y1:y2,x1:x2]
         try :
-            face_blurred = blur_img(face,factor=50)
+            face_blurred = blur_img(face,factor=70)
         except :
             # print("factor")
             try :
-                face_blurred = blur_img(face,factor=3)
+                face_blurred = blur_img(face,factor=7)
             except:
                 # face_blurred = blur_img(face,factor=1)
                 # unable to blur, face is too small
@@ -74,8 +74,8 @@ def anonymize_face_pixelate(image):
 	# divide the input image into NxN blocks
     (h, w) = image.shape[:2]
     # print(F"h {h} w {w}")
-    xblocks = int(w/2)
-    yblocks = int(h/2)
+    xblocks = int(w/3)
+    yblocks = int(h/3)
 
     xSteps = np.linspace(0, w, xblocks + 1, dtype="int")
     ySteps = np.linspace(0, h, yblocks + 1, dtype="int")
@@ -150,7 +150,7 @@ def createDirIfNotExist(d) :
     except :
         pass
 
-def annomizeImgsInDir() :
+def annomizeImgsInDir(outDir,facesDir,personDir) :
     outDir = os.path.join(os.getcwd(),"annomizedImgs") 
     facesDir = os.path.join(os.getcwd(),"faces")
     personDir = os.path.join(os.getcwd(),"groundtruths")

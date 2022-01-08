@@ -152,9 +152,9 @@ class GetMask():
             torch.cuda.empty_cache()
         del self.model
         torch.cuda.empty_cache()
-    def generateRandomColors(self,maxColors=50) :
+    def generateRandomColors(self,maxColors=200) :
         return [tuple(val) for val in np.random.choice(range(256),size=(maxColors,3))]
 
 if __name__ == "__main__" :
     m = GetMask()
-    d_out = m.generateMasks("/home/akunchala/Downloads/Wildtrack_dataset/Image_subsets/C1","out")
+    d_out = m.generateMasks("/home/akunchala/Documents/z_Datasets/Wildtrack_dataset/Image_subsets/C1","out")

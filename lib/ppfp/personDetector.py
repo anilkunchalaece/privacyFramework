@@ -7,10 +7,10 @@ import cv2
 import numpy as np
 from torchvision.transforms import transforms as transforms
 from PIL import Image
-from maskDataset import MaskDataset
+from lib.ppfp.maskDataset import MaskDataset
 from torch.utils.data import DataLoader
-from config import getConfig as config
-import os
+from lib.ppfp.config import getConfig as config
+import os,json
 import pandas as pd
 import shutil
 
@@ -43,6 +43,7 @@ class PersonDetector:
         pred = self.detector(imgs)
         print(len(pred[0]['boxes']))
         return pred
+
 
     def generateDetections(self,imageDir,dirToSave):
         dataset = MaskDataset(imageDir, self.transform)
@@ -86,6 +87,7 @@ class PersonDetector:
 
                     i_final = []
                     for i,b in enumerate(boxes) :
+                        
                         # print(b)
                         x = []
                         x.extend([fName,"person"])
@@ -110,6 +112,48 @@ class PersonDetector:
         out_pd = pd.DataFrame(out_list,columns=['image','class_label','x_top_left','y_top_left','x_bottom_right','y_bottom_right','score'])
         # print(out_pd)
         out_pd.to_pickle("orig_images_scaled_output.pkl")
+
+    def generateDetections2(self,imageDir,dirToSave,fToSave):
+        dataset = MaskDataset(imageDir, self.transform)
+        dataLoader = DataLoader(dataset,batch_size=self.batchSize,shuffle=False)
+
+        # out_names = []
+        # out_bbox = []
+        out_list = []
+
+        for idx, data in enumerate(dataLoader) :
+            with torch.no_grad():
+                # print(data["fileName"])
+                img_names = data["fileName"]
+                data = data["value"].to(self.device)
+                out = self.detector(data)
+                for idx, d in enumerate(out) :
+                    im_name = img_names[idx]
+                    boxes = torchvision.ops.box_convert(d["boxes"], "xyxy", "xywh")
+                    areas = torchvision.ops.box_area(d["boxes"])
+
+                    for i in range(d["boxes"].shape[0]) :
+                        if d["scores"][i].item() >= 0.5 and d["labels"][i].item() == 1:
+                            _kp = {
+                                "image_id" : int(os.path.basename(im_name).split(".")[0]),
+                                "category_id" : d["labels"][i].item(),
+                                # "keypoints" : d["keypoints"][i,:,:].reshape(1,-1).tolist()[0],
+                                "score" : d["scores"][i].item(),
+                                "bbox" : boxes[i].tolist(),
+                                "area" : areas[i].item()
+                            }
+                            out_list.append(_kp)
+
+        outFilePath = os.path.join(dirToSave,fToSave)
+
+        with open(outFilePath,'w') as fd :
+            json.dump(out_list,fd)
+        
+        del self.detector
+        torch.cuda.empty_cache()
+        
+        print(F"Bboxes are saved to {outFilePath}")
+        return outFilePath
 
 if __name__ == "__main__" :
     # import sys

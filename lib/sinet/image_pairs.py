@@ -30,7 +30,7 @@ class ImagePairGen :
         else :
             totalIds = os.listdir(srcDir)
 
-        print(F" total number of pedestrian ids in dir {self.rootDir} => {len(totalIds)}")
+        # print(F" total number of pedestrian ids in dir {self.rootDir} => {len(totalIds)}")
         
         # limit the number of ids to generate pairs -> used for faster testing 
         if self.limit_ids != None :
@@ -50,17 +50,18 @@ class ImagePairGen :
 
             # get list of tracklets and no of images it contains
             tImgs = [len(glob.glob(F"{_sidDir}/*{t}*")) for t in tracklets]
-            tImgsMaxIndex = tImgs.index(max(tImgs))
-            
-            tMaxFrames = tracklets[tImgsMaxIndex]
-            # print(F"no of tracklets in pId : {sId} are : {len(tracklets)} and tacklet : {tMaxFrames} has Max number of frames : {max(tImgs)}")
-            # self.getTrackeletIdwithMaxFrames(_sidDir)
-            pImgs= glob.glob(F"{_sidDir}/*{tMaxFrames}*") 
-            if self.max_frames == None or max(tImgs) < self.max_frames:
-                allImgs[sId] = pImgs
-            else : 
-                # print(F"selecting only : {self.max_frames} images from {max(tImgs)}")
-                allImgs[sId] = glob.glob(F"{_sidDir}/*{tMaxFrames}*")[:self.max_frames]
+            if len(tImgs) > 0 :
+                tImgsMaxIndex = tImgs.index(max(tImgs))
+                
+                tMaxFrames = tracklets[tImgsMaxIndex]
+                # print(F"no of tracklets in pId : {sId} are : {len(tracklets)} and tacklet : {tMaxFrames} has Max number of frames : {max(tImgs)}")
+                # self.getTrackeletIdwithMaxFrames(_sidDir)
+                pImgs= glob.glob(F"{_sidDir}/*{tMaxFrames}*") 
+                if self.max_frames == None or max(tImgs) < self.max_frames:
+                    allImgs[sId] = pImgs
+                else : 
+                    # print(F"selecting only : {self.max_frames} images from {max(tImgs)}")
+                    allImgs[sId] = glob.glob(F"{_sidDir}/*{tMaxFrames}*")[:self.max_frames]
         
         return allImgs
 

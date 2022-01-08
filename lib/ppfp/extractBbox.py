@@ -10,6 +10,7 @@ import os
 import json
 from multiprocessing import Pool
 import cv2
+import matplotlib.pyplot as plt
 
 
 def loadBboxFile(fName,t,cols) :
@@ -151,11 +152,157 @@ def cropBboxImages():
     with Pool() as pool:
         pool.map(cropImage,[getMatchingBboxes(x) for x in os.listdir("groundtruths")])
 
+class BBoxExtractor:
+    
+    def __init__(self,gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile,min_size=20):
+        self.gtLocation = gtImgsLocation
+        self.predLocation = predImgsLocation
+        self.annonDir = annonDir
+        self.gtFile = gtDetFile
+        self.predFile = predDetFile
+        self.min_size = min_size # images with height and width smaller than this will be removed
+        self.matchingBboxes = {} # dict to save output matching bboxes
+    
+    def getMatchingBboxes(self):
+        gtBbox = self.processBBoxFile(self.gtFile)
+        predBbox = self.processBBoxFile(self.predFile)
+        out = {}
+
+        for k in gtBbox.keys():
+            try :
+                _gtV = torch.tensor(gtBbox[k])
+                _predV = torch.tensor(predBbox[k])
+
+                _gtV = torchvision.ops.box_convert(_gtV,"xywh","xyxy")
+                _predV = torchvision.ops.box_convert(_predV,"xywh","xyxy")
+
+                # remove small bboxes
+                _gtV = _gtV[torchvision.ops.remove_small_boxes(_gtV,self.min_size),:]
+                _predV = _predV[torchvision.ops.remove_small_boxes(_predV,self.min_size),:]
+
+                iou_values = torchvision.ops.box_iou(_gtV,_predV)
+                iou_thres = iou_values >= 0.5
+                indices = torch.nonzero(iou_thres)
+
+                _gt = []
+                _pred = []
+                for i in indices :
+                    _gt.append([int(x) for x in _gtV[i.numpy()[0]].tolist()])
+                    _pred.append([ int(x) for x in _predV[i.numpy()[1]].tolist()])
+
+                out[k] = {
+                    "gt" : _gt,
+                    "pred" : _pred
+                }
+            except :
+                pass
+        return out
+    
+
+    def cropBbox(self,k) :
+        bboxes = self.matchingBboxes[k]
+        
+        gt_d = os.path.join(self.annonDir,"gt","bbox",k)
+        pred_d = os.path.join(self.annonDir,"pred","bbox",k)
+
+                
+        gt_img = cv2.imread(os.path.join(self.gtLocation,F"{int(k):06d}.png"))
+        pred_img = cv2.imread(os.path.join(self.predLocation,F"{int(k):06d}.png"))
+
+        self.createDirIfNotExist(gt_d)
+        self.createDirIfNotExist(pred_d)
+
+        # create dir for blur bboxes
+        for d in os.listdir(os.path.join(self.annonDir,"blur")) :
+            self.createDirIfNotExist(os.path.join(self.annonDir,"blur",d,"bbox",k))
+
+        # create dir for blur bboxes
+        for d in os.listdir(os.path.join(self.annonDir,"pix")) :
+            self.createDirIfNotExist(os.path.join(self.annonDir,"pix",d,"bbox",k))
+        
+        for i,x in enumerate(bboxes["gt"]) :
+
+            gt_c = gt_img[bboxes["gt"][i][1]:bboxes["gt"][i][3],bboxes["gt"][i][0]:bboxes["gt"][i][2]]
+            pred_c = pred_img[bboxes["pred"][i][1]:bboxes["pred"][i][3], bboxes["pred"][i][0]:bboxes["pred"][i][2]]
+
+            for d in os.listdir(os.path.join(self.annonDir,"blur")) :
+                
+                # print(os.path.join(self.annonDir,"blur",d,"blur_body",F"{int(k):06d}.png"))
+                b_img = cv2.imread(os.path.join(self.annonDir,"blur",d,"blur_body",F"{int(k):06d}.png"))
+                b_img_c = b_img[bboxes["gt"][i][1]:bboxes["gt"][i][3],bboxes["gt"][i][0]:bboxes["gt"][i][2]]
+                cv2.imwrite(os.path.join(self.annonDir,"blur",d,"bbox",k,F'{i}.png'),b_img_c)
+
+            for d in os.listdir(os.path.join(self.annonDir,"pix")) :
+                b_img = cv2.imread(os.path.join(self.annonDir,"pix",d,"pixelate_body",F"{int(k):06d}.png"))
+                b_img_c = b_img[bboxes["gt"][i][1]:bboxes["gt"][i][3],bboxes["gt"][i][0]:bboxes["gt"][i][2]]
+                cv2.imwrite(os.path.join(self.annonDir,"pix",d,"bbox",k,F'{i}.png'),b_img_c)
+
+
+
+            cv2.imwrite(os.path.join(gt_d,F'{i}.png'),gt_c)
+            cv2.imwrite(os.path.join(pred_d,F'{i}.png'),pred_c)
+
+    def createDirIfNotExist(self,d):
+        try :
+            if not os.path.isdir(d) :
+                try :
+                    os.mkdir(d)
+                except :
+                    os.makedirs(d)
+        except :
+            pass
+    
+    def extractAllBboxes(self) :
+        self.matchingBboxes = self.getMatchingBboxes()
+        # print(self.matchingBboxes)
+        # self.cropBbox("1")
+        with Pool() as pool:
+            pool.map(self.cropBbox, self.matchingBboxes.keys())
+    
+    def plotSinetValues(self,fileName) :
+        y = []
+        with open(fileName) as fd :
+            data = json.load(fd)
+
+            k = sorted(data, key=data.get)
+            for i in k :
+                y.append(data[i])
+            
+            plt.plot(k,y)
+            plt.xticks(rotation=90)
+            plt.show()
+
+    
+    def processBBoxFile(self,fileName) :
+        with open(fileName) as fd:
+            data = json.load(fd)
+
+            outData = {}
+            for d in data :
+                k = str(d["image_id"]) # why string ? number are not allowed as dict keys
+                if outData.get(k,0) == 0 :
+                    outData[k] = []
+                outData[k].append(d["bbox"])
+
+            return outData
+
 
 if __name__ == "__main__" :
     # fName = "groundtruths/000000.txt"
     # print(loadBboxFile(fName))
-    dirToSave = "matchingBboxes"
-    bboxDir = "bbox"
+    # dirToSave = "matchingBboxes"
+    # bboxDir = "bbox"
     # getMatchingBboxes(dirToSave)
-    cropBboxImages()
+    # cropBboxImages()
+    gtImgsLocation = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp2/orig_images_scaled"
+    predImgsLocation = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp2/orig_images_scaled_output"
+
+    annonDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/annoImgs"
+
+    gtDetFile = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp2/personDetectorOut/orig.json"
+    predDetFile = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp2/personDetectorOut/pred.json"
+
+
+    bb = BBoxExtractor(gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile)
+    # bb.extractAllBboxes()
+    bb.plotSinetValues("/home/akunchala/Documents/PhDStuff/PrivacyFramework/pixEval.json")

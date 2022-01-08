@@ -13,7 +13,7 @@ Pipeline consist of following
 """
 
 import argparse
-import os,sys,subprocess,shutil
+import os,sys,subprocess,shutil,json
 
 from getMaksFromImage import GetMask
 from lib.ppfp.config import getConfig
@@ -21,9 +21,18 @@ from lib.ppfp.insightFace import InsightFaceDetector
 from lib.ppfp.personDetector import PersonDetector
 from lib.ppfp.keyPointDetector import KeyPointDetector
 from lib.ppfp.annonImgs import AnnonImgs
+from lib.ppfp.extractBbox import BBoxExtractor
+import sinet_train as sinet
 
 from multiprocessing import Pool
 from moviepy.editor import VideoFileClip, TextClip, clips_array, vfx,CompositeVideoClip
+
+c = {
+    "src" : False,
+    "pred" : False,
+    "background" : False,
+    "detections" : False,
+}
 
 def main(args):
     config = getConfig()
@@ -33,7 +42,7 @@ def main(args):
     frameRate = args.frame_rate
 
     # check if tmp dir exist or not - if not exist create one
-    createDir(args.tmp_dir,True)
+    createDir(args.tmp_dir,False)
     print(args.tmp_dir)
 
     # step 1 : check vid_file or images_dir
@@ -42,29 +51,34 @@ def main(args):
         raise("Please specify either --vid_file or --images_dir as argument")
     elif args.vid_file != None :
         srcImagesDirOrg = createDir(os.path.join(args.tmp_dir,"orig_images"))
-        generateImagesFromVideo(args.vid_file, srcImagesDirOrg)
+        if c["src"] == True :
+            generateImagesFromVideo(args.vid_file, srcImagesDirOrg)
     else :
         print(F"processing images using src {args.images_dir}")
         srcImagesDirOrg = args.images_dir
     
     # Step 1.5 -> resize the images to w, h = 432, 240 (from sttn)
-    srcImagesDir = createDir(os.path.join(args.tmp_dir,"orig_images_scaled"))
-    resizeImages(srcImagesDirOrg,srcImagesDir)
+    srcImagesDir = createDir(os.path.join(args.tmp_dir,"src","orig_images_scaled"))
+    if c["src"] == True :
+        resizeImages(srcImagesDirOrg,srcImagesDir)
 
     # step 2 : generate masks for images
     print("########## STEP 2 generating masks for images #################")
     srcImgMasksDir = createDir(os.path.join(args.tmp_dir,"masks"))
-    m = GetMask()
-    m.generateMasks(srcImagesDir, srcImgMasksDir)
+    if c["src"] == True :
+        m = GetMask()
+        m.generateMasks(srcImagesDir, srcImgMasksDir)
 
     # step 3 : run STTN to extract background
     print("########## STEP 3 extracting background #################")
     backgroundImgsDir = createDir(os.path.join(args.tmp_dir,"background"))
-    extractBackgroundUsingStnn(srcImgMasksDir, srcImagesDir,backgroundImgsDir)
+    if c["src"] == True :
+        extractBackgroundUsingStnn(srcImgMasksDir, srcImagesDir,backgroundImgsDir)
 
-    # step 4 : run VIBE to extract wireframe representations from file
-    print("########## STEP 4 generating wireframes #################")
-    extractWireframesUsingVibe(srcImagesDir,args.output_dir,backgroundImgsDir)
+    if c["pred"] == True :
+        # step 4 : run VIBE to extract wireframe representations from file
+        print("########## STEP 4 generating wireframes #################")
+        extractWireframesUsingVibe(srcImagesDir,args.output_dir,backgroundImgsDir)
 
     if generateVideo == True :
         generateVideoFromImages(backgroundImgsDir,frameRate=frameRate)
@@ -74,58 +88,153 @@ def main(args):
 
         generateFinalVideo(args.tmp_dir)
     
-    ## Ananomization pipelinr
+    ## Ananomization pipeline
     # run the face and person detector and generate the detections
     # use the detections to blur and pixelate the face and persons
 
     # detect faces
     faceDetectionsPath = os.path.join(args.tmp_dir,"faces")
     createDir(faceDetectionsPath,False)
-    fd = InsightFaceDetector(srcImagesDir,outDir=faceDetectionsPath)
-    fd.detectAllFacesInDir()
+    if c["detections"] == True :
+        fd = InsightFaceDetector(srcImagesDir,outDir=faceDetectionsPath)
+        fd.detectAllFacesInDir()
 
     # detect body
     bodyDetectionsPath = os.path.join(args.tmp_dir,"persons")
     createDir(bodyDetectionsPath)
-    pd = PersonDetector()
-    pd.generateDetections(srcImagesDir,dirToSave=bodyDetectionsPath)
+    if c["detections"] == True :
+        pd = PersonDetector()
+        pd.generateDetections(srcImagesDir,dirToSave=bodyDetectionsPath)
 
     # generate blurred & pixelated images
     annonImgsPath = os.path.join(args.tmp_dir,"annonImgs")
     # annonTools.annomizeImgsInDir(outDir=annonImgsPath,facesDir=faceDetectionsPath,personDir=bodyDetectionsPath)
 
-    aI = AnnonImgs(srcImagesDir,annonImgsPath)
-    aI.annomizeImgsInDir(facesDir=faceDetectionsPath,personDir=bodyDetectionsPath)
+    # blur and pixelate faces
+    # aI = AnnonImgs(srcImagesDir,annonImgsPath)
+    # aI.annomizeImgsInDir(facesDir=faceDetectionsPath)
 
     ## Run Person Detector and KeyPoint detector for original, privacy enhanced and annon img's
-    origDir = os.path.join(args.tmp_dir,"orig_images_scaled")
-    predDir = os.path.join(args.tmp_dir,"orig_images_scaled_output")
+    origDir = os.path.join(args.tmp_dir,"src","orig_images_scaled")
+    predDir = os.path.join(args.tmp_dir,"pred","orig_images_scaled_output")
 
-    personDetectorOutDir = os.path.join(args.tmp_dir,"personDetectorOut")
-    createDir(personDetectorOutDir)
+    # personDetectorOutDir = os.path.join(args.tmp_dir,"personDetectorOut")
+    # createDir(personDetectorOutDir)
 
-    keyPointDetectirOutDir = os.path.join(args.tmp_dir,"keyPointDetectorOut")
-    createDir(keyPointDetectirOutDir)
+    # keyPointDetectirOutDir = os.path.join(args.tmp_dir,"keyPointDetectorOut")
+    # createDir(keyPointDetectirOutDir)
 
-    kd = KeyPointDetector()
+    # kd = KeyPointDetector()
 
     # run person detector for all dirs
     print("Running detections for original rescaled images")
-    pd.generateDetections2(origDir,personDetectorOutDir,"orig.json")
-    kd.generateDetections(origDir,keyPointDetectirOutDir,"orig.json")
+    # pd.generateDetections2(origDir,personDetectorOutDir,"orig.json")
+    # kd.generateDetections(origDir,keyPointDetectirOutDir,"orig.json")
+    if c["detections"] == True :
+        detectPersons(origDir,os.path.join(args.tmp_dir,"src"),"person_det.json")
+        detectKeyPoints(origDir,os.path.join(args.tmp_dir,"src"),"keypoint_det.json")
 
     print("Running detections for privacy enhanced / pred images")
-    pd.generateDetections2(predDir,personDetectorOutDir,"pred.json")
-    kd.generateDetections(predDir,keyPointDetectirOutDir,"pred.json")
+    # pd.generateDetections2(predDir,personDetectorOutDir,"pred.json")
+    # kd.generateDetections(predDir,keyPointDetectirOutDir,"pred.json")
+    if c["detections"] == True :
+        detectPersons(predDir,os.path.join(args.tmp_dir,"pred"),"person_det.json")
+        detectKeyPoints(predDir,os.path.join(args.tmp_dir,"pred"),"keypoint_det.json")
 
-    for d in os.listdir(annonImgsPath) :
-        print(F"Running detections for {d} images")
-        pd.generateDetections2(os.path.join(annonImgsPath,d),personDetectorOutDir,F"{d}.json")
-        kd.generateDetections(os.path.join(annonImgsPath,d),keyPointDetectirOutDir,F"{d}.json")
+    # Skipping it for now
+    # # runnning for face annomizations
+    # for d in os.listdir(annonImgsPath) :
+    #     print(F"Running detections for {d} images")
+    #     createDir(os.path.join(annonImgsPath,d.split("_")[0]))
+    #     detectPersons(os.path.join(annonImgsPath,d),os.path.join(annonImgsPath,d.split("_")[0]),F"person_det.json")
+    #     detectKeyPoints(os.path.join(annonImgsPath,d),os.path.join(annonImgsPath,d.split("_")[0]),F"keypoint_det.json")
 
-     
+    
+    annonBodyImgsPath = os.path.join(args.tmp_dir,"annonBodyImgs")
+    aI = AnnonImgs(srcImagesDir,annonBodyImgsPath)
+    
+    blurRange = range(1,100,2)
+    pixelatedRange = range(2,100,2)
+
+    if c["detections"] == True :
+
+        print("Blurring images")
+        for b in blurRange :
+            aI.outDir = os.path.join(annonBodyImgsPath,"blur",str(b))
+            aI.blurFactor = b 
+            aI.blurPersonsInDir(bodyDetectionsPath)
+        
+        print("Running detections for blurred images")
+        for d in os.listdir(os.path.join(annonBodyImgsPath,"blur")) :
+            detectPersons(os.path.join(annonBodyImgsPath,"blur",d,"blur_body"),os.path.join(annonBodyImgsPath,"blur",d),"person_det.json")
+            detectKeyPoints(os.path.join(annonBodyImgsPath,"blur",d,"blur_body"),os.path.join(annonBodyImgsPath,"blur",d),"keypoint_det.json")
 
 
+        print("Pixelating images")
+        aI = AnnonImgs(srcImagesDir,annonBodyImgsPath)
+        for b in pixelatedRange :
+            aI.outDir = os.path.join(annonBodyImgsPath,"pix",str(b))
+            aI.pixelateFactor = b 
+            aI.pixelatePersonsInDir(bodyDetectionsPath)
+
+        print("Running detections for pixelated images")
+        for d in os.listdir(os.path.join(annonBodyImgsPath,"pix")) :
+            detectPersons(os.path.join(annonBodyImgsPath,"pix",d,"pixelate_body"),os.path.join(annonBodyImgsPath,"pix",d),"person_det.json")
+            detectKeyPoints(os.path.join(annonBodyImgsPath,"pix",d,"pixelate_body"),os.path.join(annonBodyImgsPath,"pix",d),"keypoint_det.json")
+
+    extractBBoxes(args)
+    calculteSIValues(args)
+
+
+def extractBBoxes(args):
+    tmpDir = args.tmp_dir
+    gtImgsLocation = os.path.join(tmpDir,"src","orig_images_scaled")
+    predImgsLocation = os.path.join(tmpDir,"pred","orig_images_scaled_output")
+    gtDetFile = os.path.join(tmpDir,"src","person_det.json")
+    predDetFile = os.path.join(tmpDir,"pred","person_det.json")
+    annonDir = os.path.join(tmpDir,"annonBodyImgs")
+
+    bExtractor = BBoxExtractor(gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile)
+    bExtractor.extractAllBboxes()
+
+def calculteSIValues(args):
+    tmpDir = args.tmp_dir
+    annonDir = os.path.join(tmpDir,"annonBodyImgs")
+
+    gtImgsDir = os.path.join(annonDir,"gt","bbox")
+    predImgsDir = os.path.join(annonDir,"pred","bbox")
+
+    pred_v = sinet.evalResults(gtImgsDir,predImgsDir)
+    
+    blur = dict()
+    for d in os.listdir(os.path.join(annonDir,"blur")) :
+        _c_si = sinet.evalResults(gtImgsDir,os.path.join(annonDir,"blur",d,"bbox"))
+        blur[d] = _c_si
+    
+    pix = dict()
+    for d in os.listdir(os.path.join(annonDir,"pix")) :
+        _c_si = sinet.evalResults(gtImgsDir,os.path.join(annonDir,"pix",d,"bbox"))
+        pix[d] = _c_si
+
+    outFile = os.path.join(annonDir,"sinetValues.json")
+    with open(outFile,"w") as fd:
+        json.dump({
+            "pred" : pred_v,
+            "blur" : blur,
+            "pix" : pix
+        },fd)
+
+
+def detectFaces() :
+    pass
+
+def detectPersons(srcDir, outDir, fileName) :
+    pd = PersonDetector()
+    pd.generateDetections2(srcDir, outDir, fileName)
+
+def detectKeyPoints(srcDir, outDir, fileName) :
+    kd = KeyPointDetector()
+    kd.generateDetections(srcDir, outDir, fileName)
 
 def resizeImages(srcDir,desDir):
     print(" resizing the images ")
@@ -216,6 +325,13 @@ if __name__ == "__main__" :
     parser.add_argument('--output_dir', type=str, help="output dir to save processed files", required=True)
     parser.add_argument('--tmp_dir', type=str, help='temp dir to save the intermediate results', default='tmp')
     parser.add_argument('--frame_rate',type=str,help='frame rate of original dataset', default='20')
+    parser.add_argument('--process',type=str,help='specify the process : main -> generate privacy enhanced, blurred and pixelated images', default='')
     
     args = parser.parse_args()
-    main(args)
+    if args.process == "main" :
+        main(args)
+    elif args.process == "extract" :
+        calculteSIValues(args)
+    elif args.process == "":
+        print("Please specify the process")
+

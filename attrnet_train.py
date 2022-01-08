@@ -197,7 +197,7 @@ def plotLoss():
 
 if __name__ == "__main__" :
     # train()
-    # plotLoss()
-    eval()
-    fileName = "/home/akunchala/Documents/z_Datasets/RAP/RAP_eval_results.pkl"
-    calculateF1Scores(fileName)
+    plotLoss()
+    # eval()
+    # fileName = "/home/akunchala/Documents/z_Datasets/RAP/RAP_eval_results.pkl"
+    # calculateF1Scores(fileName)

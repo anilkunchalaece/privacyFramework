@@ -14,6 +14,10 @@
 
     "ppfp" : {
         "batch_size" : 5,
-        "score_threshold" : 0.75
+        "score_threshold" : 0
+    },
+    "eval" : {
+        "batch_size" : 5,
+        "score_threshold" : 0
     }
 }
