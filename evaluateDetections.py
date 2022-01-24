@@ -21,7 +21,6 @@ FILE_TO_SAVE_RESULTS = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/anno
 
 def evaluate():
     dPairs = getDirPairs()
-
     outDict = {}
 
     for k in dPairs :

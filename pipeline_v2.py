@@ -23,15 +23,19 @@ from lib.ppfp.keyPointDetector import KeyPointDetector
 from lib.ppfp.annonImgs import AnnonImgs
 from lib.ppfp.extractBbox import BBoxExtractor
 import sinet_train as sinet
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
+from lib.ppfp.cocoConverter import COCOConverter 
+
 
 from multiprocessing import Pool
 from moviepy.editor import VideoFileClip, TextClip, clips_array, vfx,CompositeVideoClip
 
 c = {
-    "src" : False,
-    "pred" : False,
-    "background" : False,
-    "detections" : False,
+    "src" : True,
+    "pred" : True,
+    "background" : True,
+    "detections" : True,
 }
 
 def main(args):
@@ -153,7 +157,7 @@ def main(args):
     annonBodyImgsPath = os.path.join(args.tmp_dir,"annonBodyImgs")
     aI = AnnonImgs(srcImagesDir,annonBodyImgsPath)
     
-    blurRange = range(1,100,2)
+    blurRange = range(2,100,2)
     pixelatedRange = range(2,100,2)
 
     if c["detections"] == True :
@@ -184,6 +188,7 @@ def main(args):
 
     extractBBoxes(args)
     calculteSIValues(args)
+    calculateFinalValues(args)
 
 
 def extractBBoxes(args):
@@ -235,6 +240,76 @@ def detectPersons(srcDir, outDir, fileName) :
 def detectKeyPoints(srcDir, outDir, fileName) :
     kd = KeyPointDetector()
     kd.generateDetections(srcDir, outDir, fileName)
+
+def calculateFinalValues(args):
+    src_dir = os.path.join(args.tmp_dir,"src")
+    pred_dir = os.path.join(args.tmp_dir,"pred")
+    annonImgsDir = os.path.join(args.tmp_dir,"annonBodyImgs")
+    sinetFile = os.path.join(annonImgsDir,"sinetValues.json")
+    
+    PERSON_DET_FILE = "person_det.json"
+    KEYPOINT_DET_FILE = "keypoint_det.json"
+
+    resDict = {}
+    
+
+    srcFile_pd = os.path.join(src_dir,PERSON_DET_FILE)
+    sObj_pd = COCOConverter(srcFile_pd)
+    srcFile_pd = sObj_pd.convert()
+    predFile_pd = os.path.join(pred_dir,PERSON_DET_FILE)
+
+    srcFile_kd = os.path.join(src_dir,KEYPOINT_DET_FILE)
+    sObj_kd = COCOConverter(srcFile_kd)
+    srcFile_kd = sObj_kd.convert()
+    predFile_kd = os.path.join(pred_dir,KEYPOINT_DET_FILE)
+
+    pred_pd = getCocoEval(srcFile_pd,predFile_pd,"bbox")
+    pred_kd = getCocoEval(srcFile_kd,predFile_kd,"keypoints")
+
+    #load sinetValues
+    with open(sinetFile) as fd:
+        siNetValues = json.load(fd)
+        
+    # print(pred_pd)
+    # print(pred_kd)
+    for d in os.listdir(os.path.join(annonImgsDir,"blur")) :
+        print(F" ===> print running for {d}")
+        resDict[d] = {
+            "blur" : {
+                "personDetector" : getCocoEval(srcFile_pd, os.path.join(annonImgsDir,"blur",d,PERSON_DET_FILE), "bbox"),
+                "keypointDetector" : getCocoEval(srcFile_kd, os.path.join(annonImgsDir,"blur",d,KEYPOINT_DET_FILE), "keypoints"),
+                "similarityIndex" :  siNetValues["blur"][d]
+            },
+            "pix" : {
+                    "personDetector" : getCocoEval(srcFile_pd, os.path.join(annonImgsDir,"pix",d,PERSON_DET_FILE), "bbox"),
+                    "keypointDetector" : getCocoEval(srcFile_kd, os.path.join(annonImgsDir,"pix",d,KEYPOINT_DET_FILE), "keypoints"),
+                    "similarityIndex" :  siNetValues["pix"][d]
+                }
+            }
+    resDict["wireframe"] = {
+        "personDetector" : pred_pd,
+        "keypointDetector" : pred_kd,
+        "similarityIndex" : siNetValues["pred"]
+    }
+
+    with open(os.path.join(args.tmp_dir,"results.json"),'w') as fw :
+        json.dump(resDict,fw)
+
+
+def getCocoEval(gtFile, resFile, key) :
+    try :
+        cocoGt=COCO(gtFile)
+        cocoDt=cocoGt.loadRes(resFile)
+        cocoEval = COCOeval(cocoGt,cocoDt,key)
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()    
+        return cocoEval.stats.tolist()
+    except Exception as e :
+        print("################## EXCEPTION ############")
+        print(str(e))
+        return 0
+
 
 def resizeImages(srcDir,desDir):
     print(" resizing the images ")
@@ -332,6 +407,8 @@ if __name__ == "__main__" :
         main(args)
     elif args.process == "extract" :
         calculteSIValues(args)
+    elif args.process == "plot" :
+        calculateFinalValues(args)
     elif args.process == "":
         print("Please specify the process")
 
