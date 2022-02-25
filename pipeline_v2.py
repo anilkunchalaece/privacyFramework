@@ -14,6 +14,7 @@ Pipeline consist of following
 
 import argparse
 import os,sys,subprocess,shutil,json
+import matplotlib.pyplot as plt
 
 from getMaksFromImage import GetMask
 from lib.ppfp.config import getConfig
@@ -198,8 +199,9 @@ def extractBBoxes(args):
     gtDetFile = os.path.join(tmpDir,"src","person_det.json")
     predDetFile = os.path.join(tmpDir,"pred","person_det.json")
     annonDir = os.path.join(tmpDir,"annonBodyImgs")
+    segmDir = os.path.join(tmpDir,"segmentation","maskWithBackground")
 
-    bExtractor = BBoxExtractor(gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile)
+    bExtractor = BBoxExtractor(gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile,segmDir)
     bExtractor.extractAllBboxes()
 
 def calculteSIValues(args):
@@ -208,8 +210,11 @@ def calculteSIValues(args):
 
     gtImgsDir = os.path.join(annonDir,"gt","bbox")
     predImgsDir = os.path.join(annonDir,"pred","bbox")
+    segmentationDir = os.path.join(annonDir,"segm","bbox")
 
     pred_v = sinet.evalResults(gtImgsDir,predImgsDir)
+    segm_v = sinet.evalResults(gtImgsDir,segmentationDir)
+
     
     blur = dict()
     for d in os.listdir(os.path.join(annonDir,"blur")) :
@@ -225,6 +230,7 @@ def calculteSIValues(args):
     with open(outFile,"w") as fd:
         json.dump({
             "pred" : pred_v,
+            "segm" : segm_v,
             "blur" : blur,
             "pix" : pix
         },fd)
@@ -244,6 +250,8 @@ def detectKeyPoints(srcDir, outDir, fileName) :
 def calculateFinalValues(args):
     src_dir = os.path.join(args.tmp_dir,"src")
     pred_dir = os.path.join(args.tmp_dir,"pred")
+    segm_dir = os.path.join(args.tmp_dir,"segmentation")
+
     annonImgsDir = os.path.join(args.tmp_dir,"annonBodyImgs")
     sinetFile = os.path.join(annonImgsDir,"sinetValues.json")
     
@@ -263,8 +271,14 @@ def calculateFinalValues(args):
     srcFile_kd = sObj_kd.convert()
     predFile_kd = os.path.join(pred_dir,KEYPOINT_DET_FILE)
 
+    segmFile_pd = os.path.join(segm_dir,PERSON_DET_FILE)
+    segmFile_kd = os.path.join(segm_dir,KEYPOINT_DET_FILE)
+
     pred_pd = getCocoEval(srcFile_pd,predFile_pd,"bbox")
     pred_kd = getCocoEval(srcFile_kd,predFile_kd,"keypoints")
+
+    segm_pd = getCocoEval(srcFile_pd,segmFile_pd,"bbox")
+    segm_kd = getCocoEval(srcFile_kd,segmFile_kd,"keypoints")
 
     #load sinetValues
     with open(sinetFile) as fd:
@@ -292,8 +306,76 @@ def calculateFinalValues(args):
         "similarityIndex" : siNetValues["pred"]
     }
 
+    resDict["segmentation"] = {
+        "personDetector" : segm_pd,
+        "keypointDetector" : segm_kd,
+        "similarityIndex" : siNetValues["segm"]
+    }
+
+
     with open(os.path.join(args.tmp_dir,"results.json"),'w') as fw :
         json.dump(resDict,fw)
+
+def runSegmentation(args):
+    srcDir = os.path.join(args.tmp_dir,"segmentation","maskWithBackground")
+    desDir = os.path.join(args.tmp_dir,"segmentation")
+
+    detectPersons(srcDir,desDir,"person_det.json")
+    detectKeyPoints(srcDir,desDir,"keypoint_det.json")
+
+
+def visualizeResults(args):
+    srcFile = os.path.join(args.tmp_dir,"results.json")
+    try :
+        with open(srcFile) as fd:
+            data = json.load(fd)
+    except Exception as E:
+        print(F"Unable to load the results file from {srcFile}, exited with Exception {E}")
+        raise E
+    
+    # Plot the blur utility vs privacy
+    blur = []
+    for i in data.keys() :
+        if i != "wireframe" :
+            if type(data[i]["blur"]["personDetector"]) == list :
+                try :
+                    _pd_ap = data[i]["blur"]["personDetector"][5]
+                    _pd_ar = data[i]["blur"]["personDetector"][-1]
+                    _pd_f1 = (2.0*(_pd_ap*_pd_ar))/(_pd_ap+_pd_ar)
+                    _kd_ap = data[i]["blur"]["keypointDetector"][4]
+                    _kd_ar = data[i]["blur"]["keypointDetector"][-1]
+                    _kd_f1 = 2*(_kd_ap*_kd_ar)/(_kd_ap+_kd_ar)
+                    print(F"{i} => _pd_f1 : {_pd_f1}     _kd_f1 : {_kd_f1}")
+                    blur.append({
+                        "idx" : int(i),
+                        "utility" : 0.5*(_pd_f1 + _kd_f1),
+                        "privacy" : 1 - data[i]["blur"]["similarityIndex"]
+                    })
+                except :
+                    print(F"unable to capture for {i}")
+        else :
+            _wp_ap = data[i]["personDetector"][5]
+            _wp_ar = data[i]["personDetector"][-1]
+            _wp_f1 = (2.0*(_wp_ap*_wp_ar))/(_wp_ap+_wp_ar)
+            _wk_ap = data[i]["keypointDetector"][4]
+            _wk_ar = data[i]["keypointDetector"][-1]
+            _wk_f1 = (2.0*(_wk_ap*_wk_ar))/(_wk_ap+_wk_ar)
+            _w_pr = data[i]["similarityIndex"]
+            print(F"{i} => _wp_f1 : {_wp_f1}     _wk_f1 : {_wk_f1}    si: {_w_pr}")
+    blur = sorted(blur,key=lambda x:x["idx"], reverse=False)
+    sizeToPlot = 11
+    idx = [x["idx"] for x in blur ][:sizeToPlot]
+    utility = [x["utility"] for x in blur][:sizeToPlot]
+    privacy = [x["privacy"] for x in blur][:sizeToPlot]
+
+    fig, ax = plt.subplots()
+    plt.xlabel("Privacy Metric")
+    plt.ylabel("Utility Metric")
+    ax.plot(privacy,utility,"-*",label="blur")
+    # ax.plot(privacy,utility)
+    for i, txt in enumerate(idx):
+        ax.annotate(txt, (privacy[i]+0.002, utility[i]+0.002))
+    plt.show()
 
 
 def getCocoEval(gtFile, resFile, key) :
@@ -406,9 +488,14 @@ if __name__ == "__main__" :
     if args.process == "main" :
         main(args)
     elif args.process == "extract" :
+        extractBBoxes(args)
         calculteSIValues(args)
-    elif args.process == "plot" :
+    elif args.process == "final" :
         calculateFinalValues(args)
+    elif args.process == "plot" :
+        visualizeResults(args)
+    elif args.process == "segmentation":
+        runSegmentation(args)
     elif args.process == "":
         print("Please specify the process")
 

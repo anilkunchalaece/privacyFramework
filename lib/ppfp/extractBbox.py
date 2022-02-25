@@ -154,9 +154,10 @@ def cropBboxImages():
 
 class BBoxExtractor:
     
-    def __init__(self,gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile,min_size=20):
+    def __init__(self,gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile,segmentationLocation,min_size=20):
         self.gtLocation = gtImgsLocation
         self.predLocation = predImgsLocation
+        self.segmLocation = segmentationLocation
         self.annonDir = annonDir
         self.gtFile = gtDetFile
         self.predFile = predDetFile
@@ -204,13 +205,15 @@ class BBoxExtractor:
         
         gt_d = os.path.join(self.annonDir,"gt","bbox",k)
         pred_d = os.path.join(self.annonDir,"pred","bbox",k)
-
+        segm_d = os.path.join(self.annonDir,"segm","bbox",k)
                 
         gt_img = cv2.imread(os.path.join(self.gtLocation,F"{int(k):06d}.png"))
         pred_img = cv2.imread(os.path.join(self.predLocation,F"{int(k):06d}.png"))
+        segm_img = cv2.imread(os.path.join(self.segmLocation,F"{int(k):06d}.png"))
 
         self.createDirIfNotExist(gt_d)
         self.createDirIfNotExist(pred_d)
+        self.createDirIfNotExist(segm_d)
 
         # create dir for blur bboxes
         for d in os.listdir(os.path.join(self.annonDir,"blur")) :
@@ -224,6 +227,7 @@ class BBoxExtractor:
 
             gt_c = gt_img[bboxes["gt"][i][1]:bboxes["gt"][i][3],bboxes["gt"][i][0]:bboxes["gt"][i][2]]
             pred_c = pred_img[bboxes["pred"][i][1]:bboxes["pred"][i][3], bboxes["pred"][i][0]:bboxes["pred"][i][2]]
+            segm_c = segm_img[bboxes["gt"][i][1]:bboxes["gt"][i][3], bboxes["gt"][i][0]:bboxes["gt"][i][2]]
 
             for d in os.listdir(os.path.join(self.annonDir,"blur")) :
                 
@@ -241,6 +245,7 @@ class BBoxExtractor:
 
             cv2.imwrite(os.path.join(gt_d,F'{i}.png'),gt_c)
             cv2.imwrite(os.path.join(pred_d,F'{i}.png'),pred_c)
+            cv2.imwrite(os.path.join(segm_d,F'{i}.png'),segm_c)
 
     def createDirIfNotExist(self,d):
         try :

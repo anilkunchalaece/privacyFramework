@@ -112,7 +112,7 @@ class GetMask():
             cv2.imwrite(outFName, imgWithMasks)
             # print(F"img with mask saved to {outFName}")
 
-    def generateMasks(self, imageDir, dirToSave) :
+    def generateMasks(self, imageDir, dirToSave, backgroundImgDir=None) :
         
         dataset = MaskDataset(imageDir, self.transform)
         dataLoader = DataLoader(dataset,batch_size=self.batchSize,shuffle=False)
@@ -142,9 +142,15 @@ class GetMask():
                     masks = torch.from_numpy(masks).type(torch.bool)
 
                     orgImg = np.array(Image.open(fName)).transpose(2,0,1)
-                    imgEmpty = torch.zeros(orgImg.shape,dtype=torch.uint8) # may be need to replace with 1's to only masks with white background TODO -> need to check this again
 
-                    imgWithMasks = draw_segmentation_masks(imgEmpty, masks,colors=colors).numpy().transpose(1,2,0)
+                    if backgroundImgDir == None :
+                        backImg = torch.zeros(orgImg.shape,dtype=torch.uint8) # may be need to replace with 1's to only masks with white background TODO -> need to check this again
+                    else :
+                        backGroundImgFile = os.path.join(backgroundImgDir,os.path.basename(fName))
+                        # print(backGroundImgFile)
+                        backImg = torch.from_numpy(np.array(Image.open(backGroundImgFile)).transpose(2,0,1))
+
+                    imgWithMasks = draw_segmentation_masks(backImg, masks,colors=colors).numpy().transpose(1,2,0)
                     
                     outFName = os.path.join(dirToSave,os.path.basename(fName))
                     cv2.imwrite(outFName, imgWithMasks)                              
@@ -152,9 +158,77 @@ class GetMask():
             torch.cuda.empty_cache()
         del self.model
         torch.cuda.empty_cache()
+
+    def selective_mask_t(self,image_src, mask, channels=[]):    
+        mask = mask[:, torch.tensor(channels).long()]
+        mask = torch.sgn(torch.sum(mask, dim=0)).to(dtype=image_src.dtype).unsqueeze(-1)
+        print(mask.shape , image_src.shape)
+        return mask * image_src
+
+    def generateMasks_neuralArt(self, imageDir, dirToSave, backgroundImgDir=None,neuralStyleImgDir=None) :
+        
+        dataset = MaskDataset(imageDir, self.transform)
+        dataLoader = DataLoader(dataset,batch_size=self.batchSize,shuffle=False)
+        colors = self.generateRandomColors()
+        for idx, data in enumerate(dataLoader) :
+            with torch.no_grad():
+                # print(data["fileName"])
+                img_names = data["fileName"]
+                data = data["value"].to(self.device)
+                out = self.model(data)
+
+                for idx, eachDetection in enumerate(out) :
+                    fName = img_names[idx]
+
+                    # check scores with >= score_threshold
+                    scoreIdxs = np.argwhere(eachDetection["scores"].detach().cpu().numpy() >= self.config["score_threshold"]).squeeze()
+                    # print(F"Found {scoreIdxs.shape} scores above threshold {self.config['score_threshold']}")
+
+                    # based on threshold_score_idxs get label indexes which are only human
+                    labelIdxs = np.argwhere(eachDetection["labels"][scoreIdxs].detach().cpu().numpy() == 1).squeeze() # label "1" is person TODO -> need to improve this part of code
+                    # print(F"Found {labelIdxs.shape} person lables above threshold")
+                    
+                    #getMasksbased on labelIdx
+                    masks = eachDetection["masks"][labelIdxs].detach().cpu().numpy().astype('uint8').squeeze()
+                    # masks = (masks >= 0.5)
+
+                    #create a tensor with mask and convert it to bool -> suitable for draw_segementation_masks
+                    # masks = torch.from_numpy(masks).type(torch.bool)
+                    # print(masks.shape)
+                    # print(masks)
+                    orgImg = cv2.imread(fName)#np.array(Image.open(fName)).transpose(2,0,1)
+                    nsFName = os.path.join(neuralStyleImgDir,os.path.basename(fName))
+                    nsImg = cv2.imread(nsFName)#    np.array(Image.open(nsFName)).transpose(2,0,1)
+
+                    # out_img = cv2.bitwise_and(nsImg,nsImg,mask=masks[1,:,:])
+                    # out_img = masks[0,:,:].astype(nsImg.dtype) * nsImg
+                    # print(out_img.shape)
+                    out_img = cv2.copyTo(nsImg, mask=masks[0,:,:])
+                    
+
+                    outFName = os.path.join(dirToSave,os.path.basename(fName))
+                    cv2.imwrite(outFName, out_img)                              
+                    return
+            del out
+            torch.cuda.empty_cache()
+        del self.model
+        torch.cuda.empty_cache()
+
+
+    
     def generateRandomColors(self,maxColors=200) :
         return [tuple(val) for val in np.random.choice(range(256),size=(maxColors,3))]
 
 if __name__ == "__main__" :
     m = GetMask()
-    d_out = m.generateMasks("/home/akunchala/Documents/z_Datasets/Wildtrack_dataset/Image_subsets/C1","out")
+    # d_out = m.generateMasks("/home/akunchala/Documents/z_Datasets/Wildtrack_dataset/Image_subsets/C1","out")
+    # d_out = m.generateMasks(imageDir="/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_pevid_1_2/src/orig_images_scaled",
+    #                         dirToSave = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_pevid_1_2/segmentation/maskWithBackground",
+    #                         backgroundImgDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_pevid_1_2/background"
+    #                         )
+    
+    d_out = m.generateMasks_neuralArt(imageDir="/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/src/orig_images_scaled",
+                            dirToSave = "out_test",
+                            backgroundImgDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/background",
+                            neuralStyleImgDir = "/home/akunchala/Documents/PhDStuff/testing/fast_neural_style/out"
+                            )
