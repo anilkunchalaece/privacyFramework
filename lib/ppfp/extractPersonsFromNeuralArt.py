@@ -44,18 +44,19 @@ class ProcessNeuralArt:
         self.outDir = outDir
     
     def getOutImg(self,imgFileName):
-        img = os.path.join(self.neuralArtDir,imgFileName)
+        img_ = os.path.join(self.neuralArtDir,imgFileName)
         msk = os.path.join(self.maskDir,imgFileName)
-        bk = os.path.join(self.backgroundDir,imgFileName)
-
+        bk_ = os.path.join(self.backgroundDir,imgFileName)
+        # print(msk)
+        # print(bk_)
+        # print(img_)
         outImgPath = os.path.join(self.outDir,imgFileName)
 
-        img = cv2.cvtColor(cv2.imread(img),cv2.COLOR_BGR2RGB)
-        msk1 = cv2.cvtColor(cv2.imread(msk),cv2.COLOR_BGR2RGB)
+        img = cv2.cvtColor(cv2.imread(img_),cv2.COLOR_BGR2RGB)
 
         _, mask = cv2.threshold(cv2.imread(msk, 0),0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        bk = cv2.cvtColor(cv2.imread(bk),cv2.COLOR_BGR2RGB)
+        bk = cv2.cvtColor(cv2.imread(bk_),cv2.COLOR_BGR2RGB)
 
         # get masked foreground
         fg_masked = cv2.bitwise_and(img, img, mask=mask)
@@ -69,20 +70,22 @@ class ProcessNeuralArt:
         # combine masked foreground and masked background 
         final = cv2.bitwise_or(fg_masked, bk_masked)
 
-        cv2.imwrite(outImgPath, final)
+        cv2.imwrite(outImgPath,cv2.cvtColor(final, cv2.COLOR_RGB2BGR) )
     
     def processAllImgs(self):
         allImgs = [os.path.basename(x) for x in sorted(os.listdir(self.neuralArtDir))]
         # print(allImgs)
         with Pool() as pool:
             pool.map(self.getOutImg, allImgs)
+        # for img in allImgs :
+        #     self.getOutImg(img)
 
 
 if __name__ == "__main__" :
-    neuralArtDir = "/home/akunchala/Documents/PhDStuff/testing/fast_neural_style/out"
-    maskDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/masks"
-    backgroundDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/background"
-    outDir = "/home/akunchala/Documents/PhDStuff/testing/fast_neural_style/out_with_background"
+    neuralArtDir = "/home/akunchala/Documents/PhDStuff/testing/fast_neural_style/out_cmu_1_diff/"
+    maskDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_cmu_1_1/masks"
+    backgroundDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_cmu_1_1/background"
+    outDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_cmu_1_1/neuralArt/outWithBackground"
 
     pn = ProcessNeuralArt(neuralArtDir=neuralArtDir,maskDir=maskDir,backgroundDir=backgroundDir,outDir=outDir)
     pn.processAllImgs()

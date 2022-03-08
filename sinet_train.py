@@ -197,9 +197,10 @@ def evalResults(gtDir,predDir):
     for idx, data in enumerate(pairs_dataloader):
         anchorImgs = data["anchorImg"].to(device)
         positiveImgs = data["positiveImg"].to(device)
+        # print(anchorImgs.shape)
+        # print(positiveImgs.shape)
         a_f,p_f = model(anchorImgs,positiveImgs)
         # print(a_f.shape)
-
         ap_si = nn.functional.cosine_similarity(a_f, p_f,dim=1)
         ap_si = ap_si.detach().cpu().numpy().tolist()
         # print(F" ap_si : {np.mean(ap_si)}")

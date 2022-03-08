@@ -186,7 +186,8 @@ def main(args):
         for d in os.listdir(os.path.join(annonBodyImgsPath,"pix")) :
             detectPersons(os.path.join(annonBodyImgsPath,"pix",d,"pixelate_body"),os.path.join(annonBodyImgsPath,"pix",d),"person_det.json")
             detectKeyPoints(os.path.join(annonBodyImgsPath,"pix",d,"pixelate_body"),os.path.join(annonBodyImgsPath,"pix",d),"keypoint_det.json")
-
+    
+    runSegmentation(args)
     extractBBoxes(args)
     calculteSIValues(args)
     calculateFinalValues(args)
@@ -200,8 +201,9 @@ def extractBBoxes(args):
     predDetFile = os.path.join(tmpDir,"pred","person_det.json")
     annonDir = os.path.join(tmpDir,"annonBodyImgs")
     segmDir = os.path.join(tmpDir,"segmentation","maskWithBackground")
+    neuralArtDir = os.path.join(tmpDir,"neuralArt","outWithBackground")
 
-    bExtractor = BBoxExtractor(gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile,segmDir)
+    bExtractor = BBoxExtractor(gtImgsLocation,predImgsLocation,annonDir,gtDetFile,predDetFile,segmDir,neuralArtDir)
     bExtractor.extractAllBboxes()
 
 def calculteSIValues(args):
@@ -211,26 +213,29 @@ def calculteSIValues(args):
     gtImgsDir = os.path.join(annonDir,"gt","bbox")
     predImgsDir = os.path.join(annonDir,"pred","bbox")
     segmentationDir = os.path.join(annonDir,"segm","bbox")
+    neuralArtDir = os.path.join(annonDir,"neuralArt","bbox")
 
     pred_v = sinet.evalResults(gtImgsDir,predImgsDir)
     segm_v = sinet.evalResults(gtImgsDir,segmentationDir)
+    na_v = sinet.evalResults(gtImgsDir,neuralArtDir)
 
     
     blur = dict()
-    for d in os.listdir(os.path.join(annonDir,"blur")) :
-        _c_si = sinet.evalResults(gtImgsDir,os.path.join(annonDir,"blur",d,"bbox"))
-        blur[d] = _c_si
+    # for d in os.listdir(os.path.join(annonDir,"blur")) :
+    #     _c_si = sinet.evalResults(gtImgsDir,os.path.join(annonDir,"blur",d,"bbox"))
+    #     blur[d] = _c_si
     
     pix = dict()
-    for d in os.listdir(os.path.join(annonDir,"pix")) :
-        _c_si = sinet.evalResults(gtImgsDir,os.path.join(annonDir,"pix",d,"bbox"))
-        pix[d] = _c_si
+    # for d in os.listdir(os.path.join(annonDir,"pix")) :
+    #     _c_si = sinet.evalResults(gtImgsDir,os.path.join(annonDir,"pix",d,"bbox"))
+    #     pix[d] = _c_si
 
-    outFile = os.path.join(annonDir,"sinetValues.json")
+    outFile = os.path.join(annonDir,"sinetValues2.json")
     with open(outFile,"w") as fd:
         json.dump({
             "pred" : pred_v,
             "segm" : segm_v,
+            "na_v" : na_v,
             "blur" : blur,
             "pix" : pix
         },fd)
@@ -251,6 +256,7 @@ def calculateFinalValues(args):
     src_dir = os.path.join(args.tmp_dir,"src")
     pred_dir = os.path.join(args.tmp_dir,"pred")
     segm_dir = os.path.join(args.tmp_dir,"segmentation")
+    na_dir = os.path.join(args.tmp_dir,"neuralArt")
 
     annonImgsDir = os.path.join(args.tmp_dir,"annonBodyImgs")
     sinetFile = os.path.join(annonImgsDir,"sinetValues.json")
@@ -259,7 +265,6 @@ def calculateFinalValues(args):
     KEYPOINT_DET_FILE = "keypoint_det.json"
 
     resDict = {}
-    
 
     srcFile_pd = os.path.join(src_dir,PERSON_DET_FILE)
     sObj_pd = COCOConverter(srcFile_pd)
@@ -274,11 +279,17 @@ def calculateFinalValues(args):
     segmFile_pd = os.path.join(segm_dir,PERSON_DET_FILE)
     segmFile_kd = os.path.join(segm_dir,KEYPOINT_DET_FILE)
 
+    naFile_pd = os.path.join(na_dir,PERSON_DET_FILE)
+    naFile_kd = os.path.join(na_dir,KEYPOINT_DET_FILE)
+
     pred_pd = getCocoEval(srcFile_pd,predFile_pd,"bbox")
     pred_kd = getCocoEval(srcFile_kd,predFile_kd,"keypoints")
 
     segm_pd = getCocoEval(srcFile_pd,segmFile_pd,"bbox")
     segm_kd = getCocoEval(srcFile_kd,segmFile_kd,"keypoints")
+
+    na_pd = getCocoEval(srcFile_pd,naFile_pd,"bbox")
+    na_kd = getCocoEval(srcFile_kd,naFile_kd,"keypoints")
 
     #load sinetValues
     with open(sinetFile) as fd:
@@ -286,20 +297,22 @@ def calculateFinalValues(args):
         
     # print(pred_pd)
     # print(pred_kd)
-    for d in os.listdir(os.path.join(annonImgsDir,"blur")) :
-        print(F" ===> print running for {d}")
-        resDict[d] = {
-            "blur" : {
-                "personDetector" : getCocoEval(srcFile_pd, os.path.join(annonImgsDir,"blur",d,PERSON_DET_FILE), "bbox"),
-                "keypointDetector" : getCocoEval(srcFile_kd, os.path.join(annonImgsDir,"blur",d,KEYPOINT_DET_FILE), "keypoints"),
-                "similarityIndex" :  siNetValues["blur"][d]
-            },
-            "pix" : {
-                    "personDetector" : getCocoEval(srcFile_pd, os.path.join(annonImgsDir,"pix",d,PERSON_DET_FILE), "bbox"),
-                    "keypointDetector" : getCocoEval(srcFile_kd, os.path.join(annonImgsDir,"pix",d,KEYPOINT_DET_FILE), "keypoints"),
-                    "similarityIndex" :  siNetValues["pix"][d]
-                }
-            }
+    # for d in os.listdir(os.path.join(annonImgsDir,"blur")) :
+    #     print(F" ===> print running for {d}")
+    #     resDict[d] = {
+    #         "blur" : {
+    #             "personDetector" : getCocoEval(srcFile_pd, os.path.join(annonImgsDir,"blur",d,PERSON_DET_FILE), "bbox"),
+    #             "keypointDetector" : getCocoEval(srcFile_kd, os.path.join(annonImgsDir,"blur",d,KEYPOINT_DET_FILE), "keypoints"),
+    #             "similarityIndex" :  siNetValues["blur"][d]
+    #         },
+    #         "pix" : {
+    #                 "personDetector" : getCocoEval(srcFile_pd, os.path.join(annonImgsDir,"pix",d,PERSON_DET_FILE), "bbox"),
+    #                 "keypointDetector" : getCocoEval(srcFile_kd, os.path.join(annonImgsDir,"pix",d,KEYPOINT_DET_FILE), "keypoints"),
+    #                 "similarityIndex" :  siNetValues["pix"][d]
+    #             }
+    #         }
+
+
     resDict["wireframe"] = {
         "personDetector" : pred_pd,
         "keypointDetector" : pred_kd,
@@ -312,13 +325,32 @@ def calculateFinalValues(args):
         "similarityIndex" : siNetValues["segm"]
     }
 
+    resDict["neuralArt"] = {
+        "personDetector" : na_pd,
+        "keypointDetector" : na_kd,
+        "similarityIndex" : siNetValues["na_v"]
+    }
 
-    with open(os.path.join(args.tmp_dir,"results.json"),'w') as fw :
+    with open(os.path.join(args.tmp_dir,"results2.json"),'w') as fw :
         json.dump(resDict,fw)
 
 def runSegmentation(args):
+    m = GetMask()
+    createDir(os.path.join(args.tmp_dir,"segmentation","maskWithBackground"))
+
+    m.generateMasks(os.path.join(args.tmp_dir,"src","orig_images_scaled"),
+                    os.path.join(args.tmp_dir,"segmentation","maskWithBackground"),
+                    os.path.join(args.tmp_dir,"background"))
+    
     srcDir = os.path.join(args.tmp_dir,"segmentation","maskWithBackground")
     desDir = os.path.join(args.tmp_dir,"segmentation")
+
+    detectPersons(srcDir,desDir,"person_det.json")
+    detectKeyPoints(srcDir,desDir,"keypoint_det.json")
+
+def runNeuralArt(args):
+    srcDir = os.path.join(args.tmp_dir,"neuralArt","outWithBackground")
+    desDir = os.path.join(args.tmp_dir,"neuralArt")
 
     detectPersons(srcDir,desDir,"person_det.json")
     detectKeyPoints(srcDir,desDir,"keypoint_det.json")
@@ -390,6 +422,7 @@ def getCocoEval(gtFile, resFile, key) :
     except Exception as e :
         print("################## EXCEPTION ############")
         print(str(e))
+        # raise e
         return 0
 
 
@@ -420,7 +453,7 @@ def extractWireframesUsingVibe(srcImageDir,outputDir,backgroundImgsDir):
 def generateImagesFromVideo(srcFile,dirToStoreImages):
     # generate images using given video
     print(F"generating images using video {srcFile} and saving in {dirToStoreImages}")
-    cmd = ["ffmpeg","-i",srcFile,"-vf","fps=30",F"{dirToStoreImages}/%06d.png"]
+    cmd = ["ffmpeg","-i",srcFile,"-vf","fps=10",F"{dirToStoreImages}/%06d.png"]
     runCmd(cmd)
 
 def createDir(dirName,removeIfExists=False) :
@@ -496,6 +529,8 @@ if __name__ == "__main__" :
         visualizeResults(args)
     elif args.process == "segmentation":
         runSegmentation(args)
+    elif args.process == "neuralArt":
+        runNeuralArt(args)
     elif args.process == "":
         print("Please specify the process")
 

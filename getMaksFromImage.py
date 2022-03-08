@@ -153,7 +153,7 @@ class GetMask():
                     imgWithMasks = draw_segmentation_masks(backImg, masks,colors=colors).numpy().transpose(1,2,0)
                     
                     outFName = os.path.join(dirToSave,os.path.basename(fName))
-                    cv2.imwrite(outFName, imgWithMasks)                              
+                    cv2.imwrite(outFName, cv2.cvtColor(imgWithMasks, cv2.COLOR_RGB2BGR) )                              
             del out
             torch.cuda.empty_cache()
         del self.model
@@ -208,7 +208,7 @@ class GetMask():
 
                     outFName = os.path.join(dirToSave,os.path.basename(fName))
                     cv2.imwrite(outFName, out_img)                              
-                    return
+                    # return
             del out
             torch.cuda.empty_cache()
         del self.model
@@ -227,8 +227,8 @@ if __name__ == "__main__" :
     #                         backgroundImgDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_pevid_1_2/background"
     #                         )
     
-    d_out = m.generateMasks_neuralArt(imageDir="/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/src/orig_images_scaled",
-                            dirToSave = "out_test",
-                            backgroundImgDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_mot_16_08/background",
-                            neuralStyleImgDir = "/home/akunchala/Documents/PhDStuff/testing/fast_neural_style/out"
+    d_out = m.generateMasks_neuralArt(imageDir="/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_icSense_v2_0_left/src/orig_images_scaled",
+                            dirToSave = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_icSense_v2_0_left/neuralArt/outWithBackground",
+                            backgroundImgDir = "/home/akunchala/Documents/PhDStuff/PrivacyFramework/tmp_icSense_v2_0_left/background",
+                            neuralStyleImgDir = "/home/akunchala/Documents/PhDStuff/testing/fast_neural_style/out_ic_sense"
                             )
